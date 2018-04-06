@@ -11,13 +11,29 @@ public class Card implements BoardSpace{
 	final String character;
 	boolean faceUp = false;
 	String owner = "";
+	private final int row, col;
+	
 	
 	/**
-	 * 
+	 * @param row row of the new card on the board
+	 * @param col column of the new card on the board
 	 * @param character Character or emoji which will appear on the card. 
 	 */
-	public Card (String character) {
+	public Card (String character, int col, int row) {
 		this.character = character;
+		// TODO Check that row, col > 0;
+		this.col = col;
+		this. row = row;
+	}
+	
+	@Override
+	public int row() {
+		return this.row;
+	}
+	
+	@Override
+	public int col() {
+		return this.col;
 	}
 	
 	/**
@@ -85,6 +101,20 @@ public class Card implements BoardSpace{
 		return !this.owner.equals("");
 	}
 	
+	@Override
+	public boolean match(BoardSpace that) {
+		return that instanceof Card && this.sameChar((Card) that);
+	}
+	
+	private boolean sameChar(Card that) {
+		return that.character.equals(this.character);
+	}
+	
+	@Override
+	public String character() {
+		return this.character;
+	}
+	
 	/**
 	 * 
 	 * @return image representation of the card
@@ -103,8 +133,7 @@ public class Card implements BoardSpace{
 	//TODO
 	@Override
 	public String toString() {
-		return this.character;
-
+		return this.character + " : (" + this.row + ", " + this.col + ")";
 	}
 	
 	@Override
@@ -115,10 +144,13 @@ public class Card implements BoardSpace{
 	/**
 	 * 
 	 * @param that
-	 * @return true if the both cards have the same character, owner and are either both face down or both face up. 
+	 * @return true if the both cards have the same character, owner and are either both face down 
+	 * or both face up. 
 	 */
 	private boolean equalParts(Card that) {
-		return this.character == that.character && this.owner == that.owner && this.faceUp == that.faceUp;
+		return this.character == that.character && 
+				this.owner == that.owner && 
+				this.faceUp == that.faceUp;
 	}
 
 	@Override

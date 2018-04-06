@@ -10,6 +10,18 @@ public interface BoardSpace {
 	
 	/**
 	 * 
+	 * @return row of the space
+	 */
+	public int row();
+	
+	/**
+	 * 
+	 * @return column of the space. 
+	 */
+	public int col();
+	
+	/**
+	 * 
 	 * @return true if the the space is empty
 	 */
 	public boolean isEmpty();
@@ -50,6 +62,20 @@ public interface BoardSpace {
 	 * @return true if the card has an owner
 	 */
 	public boolean hasOwner();
+	
+	/**
+	 * Returns true if two BoardSpaces represent the same character. Empty spaces do not
+	 * match each other or any card. 
+	 * @param that BoardSpace you  are comparing to
+	 * @return true if the the spaces represent the same character
+	 */
+	public boolean match(BoardSpace that);
+	
+	/**
+	 * 
+	 * @return character the card represents or " " if empty
+	 */
+	public String character();
 	
 	/**
 	 * 

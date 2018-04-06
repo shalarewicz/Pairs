@@ -6,8 +6,9 @@ import org.junit.Test;
 
 public class BoardSpaceTest {
 
-	private static final BoardSpace EMPTY = new EmptySpace();
-	private static final BoardSpace CARD = new Card("A");
+	//TODO Fix these tests
+	private static final BoardSpace EMPTY = new EmptySpace(0, 0);
+	private static final BoardSpace CARD = new Card("A", 0, 0);
 	
 	@Test
 	public void testIsEmpty() {
@@ -23,6 +24,6 @@ public class BoardSpaceTest {
 	@Test
 	public void testToString() {
 		assertEquals(" ", EMPTY.toString());
-		assertEquals("*", CARD.toString());
+		assertEquals("A : (0, 0)", CARD.toString());
 	}
 }

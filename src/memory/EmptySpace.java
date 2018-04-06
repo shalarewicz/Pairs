@@ -4,6 +4,23 @@ import java.awt.image.BufferedImage;
 
 public class EmptySpace implements BoardSpace {
 
+	private final int row, col;
+	
+	public EmptySpace(int col, int row) {
+		this.row = row;
+		this.col = col;
+	}
+	
+	@Override
+	public int row() {
+		return this.row;
+	}
+	
+	@Override
+	public int col() {
+		return this.col;
+	}
+	
 	/**
 	 * An empty space on a memory scramble board
 	 */
@@ -15,7 +32,7 @@ public class EmptySpace implements BoardSpace {
 	//TODO
 	@Override
 	public String toString() {
-		return " ";
+		return "Empty : (" + this.row + ", " + this.col + ")";
 	}
 	
 	@Override
@@ -57,7 +74,18 @@ public class EmptySpace implements BoardSpace {
 	public boolean hasOwner() {
 		return false;
 	}
+	
+	@Override
+	public boolean match(BoardSpace that) {
+		return false;
+	}
+	
+	@Override
+	public String character() {
+		return " ";
 
+	}
+	
 	@Override
 	public BufferedImage generate() {
 		// TODO Auto-generated method stub

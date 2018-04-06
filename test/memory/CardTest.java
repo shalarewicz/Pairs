@@ -29,11 +29,11 @@ public class CardTest {
         assert false; // make sure assertions are enabled with VM argument: -ea
     }
     
-    // TODO tests
+    // TODO tests for position. 
     
   
-    private static final Card UNICODE = new Card("\u00A9");
-    private static final Card EMOJI = new Card("\u1F601");
+    private static final Card UNICODE = new Card("\u00A9", 1, 1);
+    private static final Card EMOJI = new Card("\u1F601", 1, 1);
     private static final String PLAYER = "Player 1";
     private static final String PLAYER2 = "Player 2";
     
@@ -42,7 +42,7 @@ public class CardTest {
      */
     @Test
     public void testIsFaceUp() {
-    	final Card CHAR = new Card("A");
+    	final Card CHAR = new Card("A", 1, 1);
     	assertFalse("expected card face down", CHAR.isFaceUp());
     	assertTrue(CHAR.claim(PLAYER));
     	assertTrue("expected card face up", CHAR.isFaceUp());
@@ -53,7 +53,7 @@ public class CardTest {
      */
     @Test
     public void testClaimOwnedFaceUp() {
-    	final Card CHAR = new Card("A");
+    	final Card CHAR = new Card("A", 1, 1);
     	CHAR.claim(PLAYER2);
     	assertFalse("expected card to remain face up", CHAR.claim(PLAYER));
     }
@@ -63,7 +63,7 @@ public class CardTest {
      */
     @Test
     public void testClaimNotOwnedFaceUp() {
-    	final Card CHAR = new Card("A");
+    	final Card CHAR = new Card("A", 1, 1);
     	assertTrue(!CHAR.isFaceUp());
     	CHAR.claim(PLAYER);
     	CHAR.release();
@@ -76,7 +76,7 @@ public class CardTest {
      */
     @Test
     public void testPutFaceDownOwnedFaceUp() {
-    	final Card CHAR = new Card("A");
+    	final Card CHAR = new Card("A", 1, 1);
     	CHAR.claim(PLAYER2);
     	assertFalse("expected card to remain face up", CHAR.putFaceDown());
     }
@@ -86,7 +86,7 @@ public class CardTest {
      */
     @Test
     public void testPutFaceDownUnownedFaceUp() {
-    	final Card CHAR = new Card("A");
+    	final Card CHAR = new Card("A", 1, 1);
     	CHAR.claim(PLAYER2);
     	CHAR.release();
     	assertTrue("exptected card to be face down", CHAR.putFaceDown());
@@ -96,7 +96,7 @@ public class CardTest {
      */
     @Test
     public void testPutFaceDown() {
-    	final Card CHAR = new Card("A");
+    	final Card CHAR = new Card("A", 1, 1);
     	assertTrue("exptected card to be face down", CHAR.putFaceDown());
     }
     
@@ -105,7 +105,7 @@ public class CardTest {
      */
     @Test
     public void testRelease() {
-    	final Card CHAR = new Card("A");
+    	final Card CHAR = new Card("A", 1, 1);
     	CHAR.claim(PLAYER2);
     	CHAR.release();
     	assertEquals("", CHAR.getOwner());
@@ -116,7 +116,7 @@ public class CardTest {
      */
     @Test
     public void testReleaseUncontrolledFaceUp() {
-    	final Card CHAR = new Card("A");
+    	final Card CHAR = new Card("A", 1, 1);
     	CHAR.claim(PLAYER2);
     	CHAR.release();
     	CHAR.release();
@@ -128,7 +128,7 @@ public class CardTest {
      */
     @Test
     public void testReleaseUncontrolledFacedown() {
-    	final Card CHAR = new Card("A");
+    	final Card CHAR = new Card("A", 1, 1);
        	CHAR.release();
     	assertEquals("", CHAR.getOwner());
     }
@@ -138,7 +138,7 @@ public class CardTest {
      */
     @Test
     public void testHasOwner() {
-    	final Card CHAR = new Card("A");
+    	final Card CHAR = new Card("A", 1, 1);
     	assertFalse("expected uncontroled card", CHAR.hasOwner());
     	CHAR.claim(PLAYER2);
     	assertTrue("expected controlled card", CHAR.hasOwner());
@@ -146,10 +146,8 @@ public class CardTest {
     
     @Test
     public void testToString() {
-    	final Card CHAR = new Card("A");
-    	assertEquals("*", CHAR.toString());
-    	CHAR.claim(PLAYER);
-    	assertEquals("A", CHAR.toString());
+    	final Card CHAR = new Card("A", 1, 1);
+    	assertEquals("A : (1, 1)", CHAR.toString());
     }
     
     @Test
@@ -159,7 +157,7 @@ public class CardTest {
     
     @Test
     public void testUnequalOwneD() {
-    	final Card TEST = new Card("\u00A9");
+    	final Card TEST = new Card("\u00A9", 1, 1);
     	UNICODE.claim(PLAYER);
     	TEST.claim(PLAYER);
     	TEST.release();
@@ -167,7 +165,7 @@ public class CardTest {
     }
     @Test
     public void testUnequalFace() {
-    	final Card TEST = new Card("\u00A9");
+    	final Card TEST = new Card("\u00A9", 1, 1);
     	TEST.claim(PLAYER);
     	TEST.release();
     	assertFalse("expected unequal", UNICODE.equals(TEST));
