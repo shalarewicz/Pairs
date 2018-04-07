@@ -244,9 +244,9 @@ public class BoardTest {
     	Board board = new Board(cols, rows, SINGLE_CARD, false);
     	board.addPlayer(PLAYER_1);
     	board.addPlayer(PLAYER_2);
-    	assertTrue(board.flip(1, 1, PLAYER_1));
+    	assertTrue("expected to flip card", board.flip(1, 1, PLAYER_1));
     	assertEquals("owners equal", PLAYER_1, board.getCard(1, 1).getOwner());
-    	assertTrue(board.flip(2, 2, PLAYER_1));
+    	assertTrue("expected to flip card", board.flip(2, 2, PLAYER_1));
     	assertEquals("owners equal", PLAYER_1, board.getCard(2, 2).getOwner());
     	assertTrue("expected to be able to flip card", board.flip(3, 2, PLAYER_1));
     	assertTrue("expected empty card", board.getCard(1, 1).isEmpty());
@@ -295,6 +295,17 @@ public class BoardTest {
     	Board board = new Board(cols, rows, CARDS2, false);
     	board.addPlayer(PLAYER_1);
     	assertFalse("expected unflipped emptyspace",board.flip(3, 3, PLAYER_1));
+    }
+    
+    @Test
+    // tests trying to flip an empty spot. 
+    public void testFlipYourCard() {
+    	final int rows = 3;
+    	final int cols = 3;
+    	Board board = new Board(cols, rows, CARDS2, false);
+    	board.addPlayer(PLAYER_1);
+    	board.flip(1, 1, PLAYER_1);
+    	assertFalse("can't flip your own card",board.flip(1, 1, PLAYER_1));
     }
     
     @Test

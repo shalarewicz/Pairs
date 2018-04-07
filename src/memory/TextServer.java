@@ -73,11 +73,13 @@ public class TextServer {
             Socket socket = serverSocket.accept();
             //Assign the client the next available client ID. 
             int clientID = clientIDs.size() + 1;
+            System.out.println("Connecting a client with id " + clientID);
             
             // Check to make sure the client ID is unique and was successfully added
             while (!clientIDs.add(String.valueOf(clientID))) {
             	clientID++;
             }
+            System.out.println("Current clients " + clientIDs);
             this.board.addPlayer(String.valueOf(clientID));
             
             // handle the client
@@ -106,8 +108,8 @@ public class TextServer {
             for (String input = in.readLine(); input != null; input = in.readLine()) {
                 String output = handleRequest(input, id);
                 if (output.equals("")) {
-                	out.close();
-                	in.close();
+                	socket.close();
+                	break;
                 }
                 out.println(output);
             }
@@ -151,6 +153,7 @@ public class TextServer {
         if (tokens[0].equals("flip")) {
         	int column = Integer.parseInt(tokens[1]);
         	int row = Integer.parseInt(tokens[2]);
+        	System.out.println("Received flip request for " + column + " " + row + " from " + id);
         	board.flip(column, row, id);
         	return board.look(id);
         }

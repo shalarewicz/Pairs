@@ -13,6 +13,9 @@ import java.io.PrintWriter;
 import java.net.ConnectException;
 import java.net.Socket;
 import java.net.URISyntaxException;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.junit.Test;
 
@@ -21,8 +24,6 @@ import org.junit.Test;
  */
 public class TextServerTest {
     
-    // Testing strategy
-    //   TODO
     
     private static final String LOCALHOST = "127.0.0.1";
     
@@ -61,9 +62,23 @@ public class TextServerTest {
         throw new IOException("unable to connect after " + MAX_CONNECTION_ATTEMPTS + " attempts");
     }
     
+   
     @Test(expected=AssertionError.class)
     public void testAssertionsEnabled() {
         assert false; // make sure assertions are enabled with VM argument: -ea
+    }
+    
+    
+    // Testing strategy
+    //   TODO
+    
+    final private Set<String> CARDS = new HashSet<String>(Arrays.asList("A", "B"));
+    final private Set<String> SINGLE_CARDS = new HashSet<String>(Arrays.asList("A"));
+    final private String look = "look";
+    final private String quit = "quit";
+    
+    private static String flip(int col, int row) {
+    	return "flip " + col + " " + row;
     }
     
     @Test
@@ -86,23 +101,48 @@ public class TextServerTest {
     }
     
     @Test
-    public void testHelloInvalid() throws IOException, URISyntaxException {
-        // Warning! This test is not legal because it provides a null board!
-        // TODO You should revise or remove this test
+    public void testLookNoControl() throws IOException, URISyntaxException {
         // TODO You should also avoid duplicating similar code in many tests
-        final TextServer server = new TextServer(null, 0);
+        final TextServer server = new TextServer(Board.generateRandom(2, 2, 
+        		CARDS), 0);
         final Thread thread = startServer(server);
         final Socket socket = connectToServer(thread, server);
         
         final BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
         final PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
         
-        final String world = new String(new int[] { 0x1F30D }, 0, 1);
+        final String look = "look";
+        out.println(look);
+        assertEquals("expected first row", in.readLine(), " * *");
+        assertEquals("expected second row", in.readLine(), " * *");
         
-        out.println("hello " + world);
-        assertEquals("Go away,", in.readLine());
-        assertEquals(world + ".", in.readLine());
+        socket.close();
+    }
+    
+    @Test
+    //tests flip when none controlled, look when one controlled, and quit
+    public void testLookControl() throws IOException, URISyntaxException {
+        // TODO You should also avoid duplicating similar code in many tests
+        final TextServer server = new TextServer(Board.generateRandom(2, 2, 
+        		SINGLE_CARDS), 0);
+        final Thread thread = startServer(server);
+        final Socket socket = connectToServer(thread, server);
         
+        final BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        final PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+        
+        out.println(flip(1, 1));
+        assertEquals("expected first row", ">A *", in.readLine());
+        assertEquals("expected second row", " * *", in.readLine());
+        
+        out.println(look);
+        assertEquals("expected first row", ">A *", in.readLine());
+        assertEquals("expected second row", " * *", in.readLine());
+        
+        out.println(quit);
+        
+        in.close();
+        out.close();
         socket.close();
     }
     

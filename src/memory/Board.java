@@ -218,7 +218,7 @@ public class Board {
     			if (orderedCards[k][j].equals("")) {
     				this.cards[k][j] = new EmptySpace(k + 1, j + 1);
     			} else {
-    				this.cards[k][j] = new Card(orderedCards[k][j], k + 1, j + 1);
+    				this.cards[k][j] = new Card(orderedCards[k][j], j + 1, k + 1);
     			}
     		}
     	}
@@ -286,7 +286,9 @@ public class Board {
     				sb.append("  ");
     			}
     		}
-    		sb.append("\n");
+    		if (i != this.cards.length - 1) {
+    			sb.append("\n");
+    		}
     	}
     	return sb.toString();
     }
@@ -317,6 +319,9 @@ public class Board {
 			Player p = this.playerIDs.get(player);
 			BoardSpace first = this.players.get(p).getFirst();
 			BoardSpace second = this.players.get(p).getSecond();
+			if (first.equals(card) || second.equals(card)) {
+				return false;
+			}
 			if (first.isEmpty()) {
 				this.players.put(p, new Pair<BoardSpace>(card, second));
 			} 
@@ -477,6 +482,7 @@ public class Board {
     	for (int i = 0; i < this.cards.length; i++) {
     		for (int j = 0; j < this.cards[i].length; j++) {
     			sb.append(this.cards[i][j].character());
+    			sb.append(this.cards[i][j]);
     			if (j != this.cards[i].length - 1) {
     				sb.append(", ");
     			}

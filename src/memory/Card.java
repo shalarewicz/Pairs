@@ -150,7 +150,9 @@ public class Card implements BoardSpace{
 	private boolean equalParts(Card that) {
 		return this.character == that.character && 
 				this.owner == that.owner && 
-				this.faceUp == that.faceUp;
+				this.faceUp == that.faceUp &&
+				this.row == that.row &&
+				this.col == that.col;
 	}
 
 	@Override
