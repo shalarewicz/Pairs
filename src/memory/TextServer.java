@@ -22,6 +22,9 @@ public class TextServer {
     
     private final ServerSocket serverSocket;
     private final Board board;
+    //TODO Use a concurrent hashset
+    final Set<String> clientIDs = new HashSet<String>();
+    int nextClientID = 1;
     
     // Abstraction function:
     //   a server allowing you to play a memory scramble game using text protocols
@@ -44,6 +47,7 @@ public class TextServer {
     public TextServer(Board board, int port) throws IOException {
         this.serverSocket = new ServerSocket(port);
         this.board = board;
+        this.checkRep();
     }
     
     // TODO checkRep
@@ -66,30 +70,45 @@ public class TextServer {
      */
     public void serve() throws IOException {
     	//Client IDs are assigned by order of connection starting at 1;
-    	Set<String> clientIDs = new HashSet<String>();
     	
         while (true) {
-            // block until a client connects
-            Socket socket = serverSocket.accept();
-            //Assign the client the next available client ID. 
-            int clientID = clientIDs.size() + 1;
-            System.out.println("Connecting a client with id " + clientID);
-            
-            // Check to make sure the client ID is unique and was successfully added
-            while (!clientIDs.add(String.valueOf(clientID))) {
-            	clientID++;
-            }
-            System.out.println("Current clients " + clientIDs);
-            this.board.addPlayer(String.valueOf(clientID));
-            
-            // handle the client
-            try {
-                handleConnection(socket, String.valueOf(clientID));
-            } catch (IOException ioe) {
-                ioe.printStackTrace(); // but do not stop serving
-            } finally {
-                socket.close();
-            }
+        	Socket s = serverSocket.accept();
+        	if (s.isConnected()) {
+	        	new Thread(() -> {
+	        		// block until a client connects
+	        		Socket socket = s;
+	        		int clientID;
+					try {
+		        		//Assign the client the next available client ID. 
+						synchronized (this.clientIDs) {
+			        		clientID = this.nextClientID;
+			        		
+			        		// Check to make sure the client ID is unique and was successfully added
+			        		while (!clientIDs.add(String.valueOf(clientID))) {
+			        			clientID++;
+			        		}
+			        		System.out.println("Connecting a client with id " + clientID);
+			        		nextClientID = clientID + 1;
+			        		System.out.println("Current clients " + clientIDs);
+			        		this.board.addPlayer(String.valueOf(clientID));
+						}
+		        		// handle the client
+		        		try {
+		        			//	System.out.println("handling");
+		        			handleConnection(socket, String.valueOf(clientID));
+		        		} catch (IOException ioe) {
+		        			ioe.printStackTrace(); // but do not stop serving
+		        		} finally {
+							socket.close();
+		        		}
+					} catch (IOException e) {
+						System.out.println("Server Error" + e);
+						e.printStackTrace();
+					}
+					
+	        	}).start();
+        	}
+        	
         }
     }
     
@@ -106,12 +125,17 @@ public class TextServer {
         
         try {
             for (String input = in.readLine(); input != null; input = in.readLine()) {
-                String output = handleRequest(input, id);
-                if (output.equals("")) {
-                	socket.close();
-                	break;
-                }
-                out.println(output);
+            	try {
+            		String output = handleRequest(input, id);
+            		if (output.equals("")) {
+            			this.clientIDs.remove(id);
+            			socket.close();
+            			break;
+            		}
+            		out.println(output);
+            	} catch (UnsupportedOperationException e) {
+            		out.println(e.getMessage() + ": Command not recognized");
+            	}
             }
         } finally {
             out.close();
@@ -129,15 +153,6 @@ public class TextServer {
     private String handleRequest(String input, String id) {
         String[] tokens = input.split(" ");
         
-        /* TODO remove
-         * Handle a "hello <what>" request by responding with:
-         *   Hello,
-         *   <what>!
-         * if <what> is a single word, or:
-         *   Go away,
-         *   <what>.
-         * otherwise.
-         */
         if (tokens[0].equals("hello")) {
             if (tokens[1].matches("\\w+")) {
                 return "Hello,\n" + tokens[1] + "!";
@@ -151,11 +166,15 @@ public class TextServer {
         }
         
         if (tokens[0].equals("flip")) {
-        	int column = Integer.parseInt(tokens[1]);
-        	int row = Integer.parseInt(tokens[2]);
-        	System.out.println("Received flip request for " + column + " " + row + " from " + id);
-        	board.flip(column, row, id);
-        	return board.look(id);
+        	try {
+	        	int column = Integer.parseInt(tokens[1]);
+	        	int row = Integer.parseInt(tokens[2]);
+	        	System.out.println("Received flip request for (" + column + ", " + row + ") from player id: " + id);
+	        	board.flip(column, row, id);
+	        	return board.look(id);
+        	} catch (ArrayIndexOutOfBoundsException e) {
+        		throw new UnsupportedOperationException("Not enough argumetns for command: " + input);
+        	}
         }
         
         if (tokens[0].equals("quit")) {

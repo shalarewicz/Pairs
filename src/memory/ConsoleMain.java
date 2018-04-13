@@ -21,30 +21,31 @@ public class ConsoleMain {
      */
     public static void main(String[] args) {
         final int size = 10;
-        final int players = 2;
+        final int players = 5;
         final int tries = 5;
         
-        final Board board = Board.generateRandom(size, size, new HashSet<>(Arrays.asList("A", "B")));
+        final Board board = Board.generateRandom(size, size, new HashSet<>(Arrays.asList("A", "B", "C", "D")));
         
         for (int ii = 0; ii < players; ii++) {
         	String id = String.valueOf(ii + 0);
             new Thread(() -> {
                 Random random = new Random();
                 board.addPlayer(id);
-                // TODO set up player ii on the board if necessary
                 
                 for (int jj = 0; jj < tries; jj++) {
                 	final int col = random.nextInt(size - 1) + 1;
                 	final int row = random.nextInt(size - 1) + 1;
-                	System.out.println("Player " + id +" flips " + row + ", " + col);
-                	board.flip(col, row, id);
-                	System.out.println("player " + id + "\n" + board.look(id));
+                	// Try to flip over a first card at (random.nextInt(size), random.nextInt(size))
+                	//      which might block until this player can control that card
+                	if (board.flip(col, row, id)) {
+                		// And if that succeeded,
+                		//      try to flip over a second card at (random.nextInt(size), random.nextInt(size))
+                		final int col1 = random.nextInt(size - 1) + 1; 
+                    	final int row1 = random.nextInt(size - 1) + 1;
+                    	board.flip(col1, row1, id);
+                	}
                 	
-                    // TODO try to flip over a first card at (random.nextInt(size), random.nextInt(size))
-                    //      which might block until this player can control that card
                     
-                    // TODO and if that succeeded,
-                    //      try to flip over a second card at (random.nextInt(size), random.nextInt(size))
                     
                 }
             }).start();

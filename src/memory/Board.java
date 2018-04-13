@@ -73,13 +73,10 @@ public class Board {
     
     private BoardSpace[][] cards;
     private final int WIDTH, HEIGHT;
-    //TODO Use a pair of BoardSpaces as long as the BoardSpace isn't copied it should be good. 
     private final ConcurrentMap<Player, Pair<BoardSpace>> players = new ConcurrentHashMap<Player, Pair<BoardSpace>>();
     private final ConcurrentMap<String, Player> playerIDs = new ConcurrentHashMap<String, Player>();
     
     private final static BoardSpace EMPTY_SPACE = new EmptySpace(0, 0);
- // private final static int EMPTY = 0;
- // private final static Pair<Integer> EMPTY_SPOT = new Pair<Integer>(0, 0);
     
     private static class Pair<E> {
     	final E i, j;
@@ -101,6 +98,11 @@ public class Board {
     		return that instanceof Pair<?> && this.sameParts((Pair<?>) that);
     	}
     	
+    	@Override
+    	public String toString() {
+    		return "(" + this.i + ", " + this.j + ")";
+    	}
+    	
     	private boolean sameParts(Pair<?> that) {
     		return this.i.equals(i) && this.j.equals(j);
     	}
@@ -119,27 +121,14 @@ public class Board {
     // Safety from rep exposure:
     //   only primitive types (int, boolean) or immutable Strings are returned. 
     // Thread safety argument:
-    //   TODO
-    
-    
-    /**
-     * Constructs an empty board with rows rows and columns columns
-     * @param rows number of rows on the board
-     * @param columns number of columns on the board
-     */
-    //TODO Remove if not used. 
-    private Board(int columns, int rows) {
-    	this.HEIGHT= rows;
-    	this.WIDTH = columns;
-    	this.cards = new BoardSpace[rows][columns];
-    	
-    	for (int i = 0; i < HEIGHT; i++) {
-    		for (int j = 0; j < WIDTH; j++) {
-    			this.cards[i][j] = new EmptySpace(j + 1, i + 1);
-    		}
-    	}
-    	checkRep();
-    }
+    //   players and playerIDs are implemented using a ConcurrentHashMap which is a threadsafe data type
+    //   Pair<E> is an immutable type. 
+    // 	 cards look utilizes a lock on cards while looking at the board. 
+    // 	 flip obtains a lock on the card before attempting to flip the card. 
+    // 	 checkCards obtains a lock on cards before modifying the board. 
+    // 	 Card is a threadsafe data type therefore all actions involving card are threadsafe. 
+    //   TODO Constructors are threadsafe as they obtain a lock on cards. 
+    // 
     
     /**
      * 
@@ -152,7 +141,6 @@ public class Board {
      * @param shuffle if true randomly shuffles the cards on the board. 
      * @throws IllegalArgumentException if the boards does not have positive dimensions
      */
-    //TODO make private
     Board(int columns, int rows, Set<String> cards, boolean shuffle) throws IllegalArgumentException {
     	//Construct an array with an even amount of each type of card then shuffle
     	
@@ -218,7 +206,11 @@ public class Board {
     			if (orderedCards[k][j].equals("")) {
     				this.cards[k][j] = new EmptySpace(k + 1, j + 1);
     			} else {
-    				this.cards[k][j] = new Card(orderedCards[k][j], j + 1, k + 1);
+    				try {
+    					this.cards[k][j] = new Card(orderedCards[k][j], j + 1, k + 1);
+    				} catch (IllegalArgumentException iae){
+    					throw new RuntimeException(iae.getMessage());
+    				}
     			}
     		}
     	}
@@ -234,6 +226,7 @@ public class Board {
     		System.out.println();
     	}
     }
+    
     private void checkRep() {
     	// check cards is width x height;
     	assert cards.length * cards[0].length== this.WIDTH * this.HEIGHT;
@@ -257,8 +250,6 @@ public class Board {
     		}
     	}
     }
-    
-    // TODO Server Communication
     
     /**
      * 
@@ -309,43 +300,47 @@ public class Board {
     	// they already hold two cards. If they do, removed the cards if they match, otherwise
     	// flip the cards back over as long as they are still face up and not controlled by another 
     	// player. 
-    	// TODO Acquire lock on the card and for the Player. Do not need to lock this.players or 
-    	// this.playerIDs since they are ConcurrentMaps and are already threadSafe. What about the Pair objects?
-    	// TODO Make Pair threadsafe. 
-    	final BoardSpace card = this.cards[row - 1][col - 1];
-    	this.checkCards(player);
-		try {
-			boolean result = card.claim(player);
-			Player p = this.playerIDs.get(player);
-			BoardSpace first = this.players.get(p).getFirst();
-			BoardSpace second = this.players.get(p).getSecond();
-			if (first.equals(card) || second.equals(card)) {
-				return false;
-			}
-			if (first.isEmpty()) {
-				this.players.put(p, new Pair<BoardSpace>(card, second));
-			} 
-			else if (second.isEmpty()) {
-				this.players.put(p, new Pair<BoardSpace>(first, card));
-			}
-			else {
-				throw new RuntimeException("Should nevere get here player already holds two cards");
-			}
-			checkRep();
-			return result;
-		} catch (IndexOutOfBoundsException e) {
-			return false;
-		}
-	    
-    }
-    
-    private boolean holdsTwo(String id) {
-    	Player player = playerIDs.get(id);
-    	BoardSpace first = players.get(player).getFirst();
-    	BoardSpace second = players.get(player).getSecond();
-    	// If a coordinate is zero the card is not on the board. But what about empty spaces?
-    	return (!first.isEmpty() && !second.isEmpty());
     	
+    	Player p = this.playerIDs.get(player);
+    	
+    	// obtain a lock on the card
+    	synchronized (this.cards[row - 1][col - 1]) {
+    		final BoardSpace card = this.cards[row - 1][col - 1];
+    		
+    		// Handle the cards the player holds
+    		this.checkCards(player);
+    		
+    		BoardSpace first = this.players.get(p).getFirst();
+    		BoardSpace second = this.players.get(p).getSecond();
+    		
+    		// Check if the player tries to flip a card he already controls
+    		if (first.equals(card) || second.equals(card)) {
+    			return false;
+    		}
+    		
+    		// Attempt to flip the card. 
+    		try {
+    			boolean result = card.claim(player);
+    			
+    			if (result) {
+    				// If the player successfully flipped the card. Add the card to the players control
+    				if (first.isEmpty()) {
+    					this.players.put(p, new Pair<BoardSpace>(card, second));
+    				} 
+    				else if (second.isEmpty()) {
+    					this.players.put(p, new Pair<BoardSpace>(first, card));
+    				}
+    				else {
+    					throw new RuntimeException("Should never get here player already holds two cards");
+    				}
+    			}
+    			checkRep();
+    			return result;
+    		} catch (IndexOutOfBoundsException e) {
+    			return false;
+    		}
+    	}
+	    
     }
     
     /**
@@ -354,56 +349,13 @@ public class Board {
      * @param col column of the card
      * @return BoardSpace at position (i,j) or an empty space if space is not on board
      */
-    public BoardSpace getCard(int col, int row) {
-    	//TODO doubt I'll ever use this except for tests
-    	// If this is used write tests. 
+    //TODO Is this method used for testing only? Not threadsafe
+    BoardSpace getCard(int col, int row) {
     	try {
     		return this.cards[row - 1][col - 1];
     	} catch (IndexOutOfBoundsException e) {
     		return new EmptySpace(0, 0);
-	}
-    }
-    
-    /**
-     * Puts card at (row, column) = (i,j) on the board. If (row, col) is not on the board no action is 
-     * taken. 
-     * @param row row where card will be placed
-     * @param col column where card will be place
-     * @param card card added to the board
-     */
-    private void putCard(int col, int row, Card card) {
-    	try {
-    		this.cards[row - 1][col - 1] = card;
-    		checkRep();
-    	}catch (IndexOutOfBoundsException e) {
-    		// Do nothing
-		}
-    }
-    
-    /**
-     * Removes two cards at (row, col) and (row2, col2) from the board that are controlled by 
-     * the player only if the cards match and are face up. If the cards do not match they are 
-     * put face down. 
-     * @param id id of the player whose cards will be removed. 
-     */
-    // TODO make deprecate
-    private void removeCards(String id) {
-    	Player player = playerIDs.get(id);
-    	BoardSpace first = players.get(player).getFirst();
-    	BoardSpace second = players.get(player).getSecond();
-    	if (first.match(second)) {
-    		first = new EmptySpace(first.col(), first.row());
-    		second = new EmptySpace(second.col(), second.row());
-    		this.cards[first.row() - 1][first.col() - 1] = first;
-    		this.cards[second.row() - 1][second.col() - 1] = second;
-    		this.players.put(player, new Pair<BoardSpace>(first, second));
-    	} else {
-    		first.release();
-    		first.putFaceDown();
-    		second.release();
-    		second.putFaceDown();
     	}
-    	checkRep();
     }
     
     
@@ -416,21 +368,39 @@ public class Board {
      */
     private void checkCards(String id) {
     	Player player = playerIDs.get(id);
+    	
+    	// Get the cards the player currently holds
     	BoardSpace first = players.get(player).getFirst();
     	BoardSpace second = players.get(player).getSecond();
+    	
     	final BoardSpace empty1 = new EmptySpace(first.col(), first.row());
     	final BoardSpace empty2 = new EmptySpace(second.col(), second.row());
     	
-    	if (first.match(second)){
-    		this.cards[first.row() - 1][first.col() - 1] = empty1;
-    		this.cards[second.row() - 1][second.col() - 1] = empty2;
-    		this.players.put(player, new Pair<BoardSpace>(empty1, empty2));
-    	} else if (!first.isEmpty() && !second.isEmpty()){
-    		first.release();
-    		second.release();
-    		first.putFaceDown();
-    		second.putFaceDown();
-    		this.players.put(player, new Pair<BoardSpace>(empty1, empty2));
+    	// Obtain a lock on the array. Do not need to lock each card since Card is threadsafe. 
+    	// Furthermore, if the cards are removed from the board we have a lock on cards so we're good. 
+    	// TODO What if a player tries to flip a card while you are removing cards. A lock on the spot in the 
+    	// array won't solve the problem. Can't put a lock on flip because other players should be allowed to flip a card
+    	// at the same time. In it's current state it can be seen as the player was too slow to flip the card, but if the player
+    	// flips first then we removed the card the player would still be unable to flip the card as it is currently owned. On the
+    	// other hand if the cards didn't match then a lock on the card is obtained before flipping it. Is this the same as a lock 
+    	// in the Card object?
+    	synchronized (this.cards) {
+    		if (first.match(second)){
+    			this.cards[first.row() - 1][first.col() - 1] = empty1;
+    			this.cards[second.row() - 1][second.col() - 1] = empty2;
+    			this.players.put(player, new Pair<BoardSpace>(empty1, empty2));
+    		} else if (!first.isEmpty() && !second.isEmpty()){
+    			// Are these locks necessary since each BoardSpace is threadsafe?
+    			synchronized (this.cards[first.row() - 1][first.col() - 1] ) {
+	    			first.release();
+	    			first.putFaceDown();
+    			}
+    			synchronized (this.cards[second.row() - 1][second.col() - 1] ) {
+	    			second.release();
+	    			second.putFaceDown();
+    			}
+    			this.players.put(player, new Pair<BoardSpace>(empty1, empty2));
+    		}
     	}
     	
     }
@@ -450,22 +420,6 @@ public class Board {
     }
     
     /**
-     * TODO remove
-     * @return number of rows on the board
-     */
-    private int getHeight() {
-    	return this.HEIGHT;
-    }
-    
-    /**
-     * TODO remove
-     * @return number of columns on the board
-     */
-    private int getWidth() {
-    	return this.WIDTH;
-    }
-    
-    /**
      * 
      * @return An image of the current board
      */
@@ -478,16 +432,17 @@ public class Board {
     public String toString() {
     	StringBuilder sb = new StringBuilder();
     	sb.append("MEMORY: " + this.HEIGHT + " x " + this.WIDTH + "\n");
-    	
-    	for (int i = 0; i < this.cards.length; i++) {
-    		for (int j = 0; j < this.cards[i].length; j++) {
-    			sb.append(this.cards[i][j].character());
-    			sb.append(this.cards[i][j]);
-    			if (j != this.cards[i].length - 1) {
-    				sb.append(", ");
-    			}
-    		}
-    		sb.append("\n");
+    	synchronized (this.cards) {
+	    	for (int i = 0; i < this.cards.length; i++) {
+	    		for (int j = 0; j < this.cards[i].length; j++) {
+	    			sb.append(this.cards[i][j].character());
+	    			sb.append(this.cards[i][j]);
+	    			if (j != this.cards[i].length - 1) {
+	    				sb.append(", ");
+	    			}
+	    		}
+	    		sb.append("\n");
+	    	}
     	}
     	return sb.toString();
     }

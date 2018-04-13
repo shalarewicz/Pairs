@@ -6,11 +6,26 @@ public class EmptySpace implements BoardSpace {
 
 	private final int row, col;
 	
-	public EmptySpace(int col, int row) {
+	/*
+	 * AF(character) - A empty space at (row, col) that is on a memory scramble board. 
+	 * Rep Invariant - row, col > 0;
+	 * Safety from rep exposure:
+	 * 		only final values or primitive types are returned
+	 * Thread Safety Argument - 
+	 * 		EmptySpace is immutable;
+	 */
+	
+	
+	EmptySpace(int col, int row) {
 		this.row = row;
 		this.col = col;
+		checkRep();
 	}
 	
+	private void checkRep() {
+		assert this.row >= 0 && this.col >= 0;
+	}
+
 	@Override
 	public int row() {
 		return this.row;
@@ -29,7 +44,6 @@ public class EmptySpace implements BoardSpace {
 		return true;
 	}
 
-	//TODO
 	@Override
 	public String toString() {
 		return "Empty : (" + this.row + ", " + this.col + ")";

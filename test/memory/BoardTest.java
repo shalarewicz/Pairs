@@ -246,11 +246,11 @@ public class BoardTest {
     	board.addPlayer(PLAYER_2);
     	assertTrue("expected to flip card", board.flip(1, 1, PLAYER_1));
     	assertEquals("owners equal", PLAYER_1, board.getCard(1, 1).getOwner());
-    	assertTrue("expected to flip card", board.flip(2, 2, PLAYER_1));
-    	assertEquals("owners equal", PLAYER_1, board.getCard(2, 2).getOwner());
+    	assertTrue("expected to flip card", board.flip(2, 1, PLAYER_1));
+    	assertEquals("owners equal", PLAYER_1, board.getCard(2, 1).getOwner());
     	assertTrue("expected to be able to flip card", board.flip(3, 2, PLAYER_1));
     	assertTrue("expected empty card", board.getCard(1, 1).isEmpty());
-    	assertTrue("expected empty card", board.getCard(2, 2).isEmpty());
+    	assertTrue("expected empty card", board.getCard(2, 1).isEmpty());
     	BoardSpace card = board.getCard(3, 2);
     	assertTrue("expected card face up", card.isFaceUp());
     }
