@@ -85,6 +85,11 @@ public class WebServer {
         //   (do this on all your handlers)
         hello.getFilters().addAll(Arrays.asList(log, headers));
         
+        
+        //TODO Create a new thread for each type of request from a player
+        // Flip requests must continue to be sent while a watch request blocks. 
+        // Look requests should also be able to be sent while a flip or watch request blocks
+        // Concurrent flips are not allowed. 
         // Handle requests for /look/player
 		HttpContext look = server.createContext("/look/", exchange -> handleLook(exchange));
 		look.getFilters().addAll(Arrays.asList(log, headers));
@@ -328,7 +333,7 @@ public class WebServer {
     }
     
     /**
-     * Handles flip, look and watch requests from an HTTP cliend
+     * Handles flip, look and watch requests from an HTTP client
      * @param request request to be processed
      * @throws IOException
      */
@@ -339,40 +344,47 @@ public class WebServer {
     	final String player = request.player();
     	
     	if (request.isFlip()) {
-    		System.out.println("received a flip");
     		final int row = request.row();
     		final int col = request.col();
     		
     		this.board.flip(col, row, player);
     		response = this.board.httpLook(player);
+    		OutputStream body = exchange.getResponseBody();
+            PrintWriter out = new PrintWriter(new OutputStreamWriter(body, StandardCharsets.UTF_8), true);
+            out.println(response);
+            exchange.close();
+            return;
     		
     	} else if (request.isLook()) {
-    		System.out.println("Received a look");
     		response = this.board.httpLook(player);
+    		OutputStream body = exchange.getResponseBody();
+            PrintWriter out = new PrintWriter(new OutputStreamWriter(body, StandardCharsets.UTF_8), true);
+            out.println(response);
+            exchange.close();
+            return;
     		
     	} else if (request.isWatch()) {
-    		System.out.println("Received a watch");
-    		//TODO Block until the board changes. 
-    		response = this.board.httpLook(player);
+    		
+    		board.addBoardListener(new BoardListener() {
+    			@Override
+    			public void onBoardChange() {
+    				final String watchResponse = board.httpLook(player);
+    				OutputStream body = exchange.getResponseBody();
+    		        PrintWriter out = new PrintWriter(new OutputStreamWriter(body, StandardCharsets.UTF_8), true);
+    		        out.println(watchResponse);
+    		        exchange.close();
+    			}
+    		
+    		});
+    		//TODO ? not sure what will happen here. 
+    		return;
     		
     	} else {
-    		System.out.println("Got a bad request");
     		exchange.sendResponseHeaders(404, 0);
             response = "Request: "+ request + " not recognized";
             // Invalid response terminates the function.
             return;
     	}
     	
-    	// if the request is valid, respond with HTTP code 200 to indicate success
-        // - response length 0 means a response will be written
-        // - you must call this method before calling getResponseBody()
-//        exchange.sendResponseHeaders(200, 0);
-    	OutputStream body = exchange.getResponseBody();
-        PrintWriter out = new PrintWriter(new OutputStreamWriter(body, StandardCharsets.UTF_8), true);
-        out.println(response);
-        
-        
-        // if you do not close the exchange, the response will not be sent!
-        exchange.close();
     }
 }

@@ -10,7 +10,9 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -78,6 +80,8 @@ public class Board {
     private final int WIDTH, HEIGHT;
     private final ConcurrentMap<Player, Pair<BoardSpace>> players = new ConcurrentHashMap<Player, Pair<BoardSpace>>();
     private final ConcurrentMap<String, Player> playerIDs = new ConcurrentHashMap<String, Player>();
+    
+    private final List<BoardListener> listeners = new ArrayList();
     
     private final static BoardSpace EMPTY_SPACE = new EmptySpace(0, 0);
     
@@ -344,21 +348,7 @@ public class Board {
     	Player p = this.playerIDs.get(player);
     	
     	// obtain a lock on the card
-    	// TODO Not blocking correctly. Need to test this. Another player does not take control of a card after
-    	// another player relinquishes control. 
-    	// Not blocking until card is released but rather until card is flipped.
-    	// Lock is only held until a player succeeds/fails in flipping the card. 
-    	// Need to block on control
-    	
-//    	while (this.cards[row - 1][col - 1].hasOwner()) {
-//    		System.out.println("Player: " + player + " is blocking for " + row + ", " + col + 
-//    				" currently owned by " + this.cards[row - 1][col - 1].getOwner() );
-//    		continue;
-//    		//TODO Is this the right way to fix blocking problem?
-//    		//TODO Need a listener here
-//    	}
-    	System.out.println("Acquiring lock on array space");
-    	synchronized (this.cards[row -1][col -1]) {
+    //	synchronized (this.cards[row -1][col -1]) {
     		System.out.println("locking the card");
     	this.cards[row - 1][col - 1].lock();
     	try {
@@ -401,7 +391,6 @@ public class Board {
 	    				}
 	    			}
 	    			checkRep();
-//	    			System.out.println("Checked rep after " + player + " flipped " + col+ ", " + row);
 	//    			this.addActionListener(new ActionListener() {
 	//    				@Override
 	//    			    public void actionPerformed(ActionEvent event) {
@@ -409,6 +398,7 @@ public class Board {
 	//    			    }
 	//    			});
 	    				
+	    			if (result) {this.notifyBoardListeners();}
 	    			return result;
 	    		} catch (IndexOutOfBoundsException e) {
 	    			return false;
@@ -421,7 +411,7 @@ public class Board {
     	} 
     	
     	}
-    }
+//    }
     
    
 
@@ -473,16 +463,18 @@ public class Board {
     	// other hand if the cards didn't match then a lock on the card is obtained before flipping it. Is this the same as a lock 
     	// in the Card object?
 //    	System.out.println(id + " acquiring lock in checkCards");
-    	synchronized (this.cards) {
+    //	synchronized (this.cards) {
 //    		System.out.println(id + " acquired lock in checkCards");
     		if (first.match(second)){
 //    			System.out.println(id + "'s cards match");
-    			//TODO This will fuck with the locks. Potential deadlock
-    			first.release();
+    			//TODO Players are still blocking after a card is removed
+    			System.out.println("Removing matching cards");
+    			this.cards[first.row() - 1][first.col() - 1].release();
     			this.cards[first.row() - 1][first.col() - 1] = empty1;
-    			second.release();
+    			this.cards[second.row() - 1][second.col() - 1].release();
     			this.cards[second.row() - 1][second.col() - 1] = empty2;
     			this.players.put(player, new Pair<BoardSpace>(empty1, empty2));
+    			this.notifyBoardListeners();
     		} else if (!first.isEmpty() && !second.isEmpty()){
 //    			System.out.println(id + "'s cards don't match");
     			// Are these locks necessary since each BoardSpace is threadsafe?
@@ -497,10 +489,11 @@ public class Board {
 //    				System.out.println("unlocking");
 	    			second.release();
 	    			second.putFaceDown();
+	    			this.notifyBoardListeners();
     		//	}
     			this.players.put(player, new Pair<BoardSpace>(empty1, empty2));
     		}
-    	}
+    //	}
     	
     }
     
@@ -518,13 +511,12 @@ public class Board {
     	return result;
     }
     
-    /**
-     * 
-     * @return An image of the current board
-     */
-    public BufferedImage generate() {
-    	//TODO
-    	return null;
+    public void addBoardListener(BoardListener listener) {
+    	this.listeners.add(listener);
+    }
+    
+    protected void notifyBoardListeners() {
+    	this.listeners.forEach(listener -> listener.onBoardChange());
     }
     
     @Override

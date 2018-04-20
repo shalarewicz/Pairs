@@ -95,5 +95,6 @@ public interface BoardSpace {
 	
 	@Override
 	public int hashCode();
+	
 }
 

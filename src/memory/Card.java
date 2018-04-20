@@ -1,6 +1,5 @@
 package memory;
 
-import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class Card implements BoardSpace{
@@ -13,9 +12,7 @@ public class Card implements BoardSpace{
 	boolean faceUp = false;
 	String owner = "";
 	private final int row, col;
-	final ReentrantLock lock = new ReentrantLock();
-	private String lockOwner = "";
-//	Boolean lock = false;
+	private final ReentrantLock lock = new ReentrantLock();
 	
 	/*
 	 * AF(character) - A card at (row, col) that can be played on a memory scramble board. 
@@ -87,13 +84,17 @@ public class Card implements BoardSpace{
 	 * @return true if the card is successfully. returns false if the card was already controlled
 	 */
 	public boolean claim(String id) {
-		if (!this.hasOwner()) {
-			this.owner = id;
-			this.faceUp = true;
-			checkRep();
-			return true;
-		}
-		return false;
+		//synchronized (this.lock) {
+		//	this.lock.lock();
+			if (!this.hasOwner()) {
+				this.owner = id;
+				this.faceUp = true;
+				checkRep();
+				return true;
+			}
+			return false;
+			
+		//}
 	}
 	
 	/**
@@ -102,9 +103,7 @@ public class Card implements BoardSpace{
 	public void release() {
 		synchronized (this.lock){
 			this.owner = "";
-//			System.out.println("unlocked");
 			this.lock.unlock();
-//			this.lock = false;
 			this.lock.notify();
 		}
 		checkRep();
@@ -154,27 +153,12 @@ public class Card implements BoardSpace{
 				}
 			}
 			this.lock.lock();
-//			while (this.lock) {
-//				try {
-//					this.lock.wait();
-//				} catch (InterruptedException e) {
-//					// TODO Auto-generated catch block
-//					e.printStackTrace();
-//				}
-//			}
-//			this.lock = true;
-//			this.lock.notify();
 		}
-//		System.out.println("locked. lock is " + this.lock.isLocked());
-//		System.out.println("lock held by this thread " + this.lock.isHeldByCurrentThread());
 	}
 	
 	@Override
 	public void unlock(){
 		synchronized (this.lock){
-//			System.out.println("unlocked");
-//			this.lock = false;
-//			this.lock.notify();
 			this.lock.unlock();
 			this.lock.notify();
 		}

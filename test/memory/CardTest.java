@@ -129,6 +129,7 @@ public class CardTest {
     @Test
     public void testReleaseUncontrolledFacedown() {
     	final Card CHAR = new Card("A", 1, 1);
+    	CHAR.lock();
        	CHAR.release();
     	assertEquals("", CHAR.getOwner());
     }
