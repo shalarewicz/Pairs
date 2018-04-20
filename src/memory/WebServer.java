@@ -10,6 +10,8 @@ import java.io.PrintWriter;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -35,6 +37,7 @@ public class WebServer {
     private final HttpServer server;
     private final Board board;
     final ConcurrentMap<String, BlockingQueue<Request>> clients = new ConcurrentHashMap<String, BlockingQueue<Request>>();
+    final Set<String> players = new HashSet<String>();
     
     // Abstraction function:
     //   TODO
@@ -175,6 +178,7 @@ public class WebServer {
         assert path.startsWith(base);
         
         final String id = path.substring(base.length());
+        final String lookID = "/look/" + id;
         
         if (id.matches("\\w+")) {
         	 System.out.println("found valid look");
@@ -183,15 +187,17 @@ public class WebServer {
         	final Request look = new LookRequest(id, exchange);
         	
         	// IF the player is not on the board add them to the board and start a thread for them to handle 
-        	if (!clients.containsKey(id)) {
+        	if (!players.contains(id)) {
         		board.addPlayer(id);
-        		clients.put(id, new SynchronousQueue<Request>());
+        	}
+        	if (!clients.containsKey(lookID)) {
+        		clients.put(lookID, new SynchronousQueue<Request>());
     			new Thread(() -> {
     				//Start a thread for the player
     				System.out.println("started thread for " + id);
     				while (true) {
 	        			try {
-							handleRequest(clients.get(id).take());
+							handleRequest(clients.get(lookID).take());
 						} catch (IOException | InterruptedException e) {
 							e.printStackTrace();
 						}
@@ -200,7 +206,7 @@ public class WebServer {
         	} 
         	// Put the request in the player's queue
         	try {
-				clients.get(id).put(look);
+				clients.get(lookID).put(look);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
@@ -232,6 +238,7 @@ public class WebServer {
         	final int colRowDelimiterIndex = request.substring(endPlayerIndex).indexOf(","); //TODO create static variable
         	
         	final String id = request.substring(0, endPlayerIndex);
+        	final String flipID = "/flip/" + id;
         	final int col = Integer.parseInt(request.substring(endPlayerIndex + 1, colRowDelimiterIndex + endPlayerIndex ));
         	final int row = Integer.parseInt(request.substring(colRowDelimiterIndex + endPlayerIndex + 1));
         	System.out.println("Player: " + id + " flips " + col + ", " + row );
@@ -240,18 +247,18 @@ public class WebServer {
         	final Request flip = new FlipRequest(col, row, id, exchange);
         	
         	exchange.sendResponseHeaders(200, 0);
-
-        	// if the client is new then add them to the board and start a new thread to handle their requests
-        	if (!this.clients.containsKey(id)) {
-            	board.addPlayer(id);
-            	this.clients.put(id, new SynchronousQueue<Request>());
+        	if (!players.contains(id)) {
+        		board.addPlayer(id);
+        	}
+        	if (!clients.containsKey(flipID)) {
+            	this.clients.put(flipID, new SynchronousQueue<Request>());
             	new Thread(() -> {
             		System.out.println("Started a thread in flip for " + id);
             		//TODO While loop might not be necessary
             		while (true) {
 	            		try {
 	            			
-							this.handleRequest(this.clients.get(id).take());
+							this.handleRequest(this.clients.get(flipID).take());
 						} catch (IOException | InterruptedException e) {
 							// TODO Auto-generated catch block
 							e.printStackTrace();
@@ -260,7 +267,7 @@ public class WebServer {
             	}).start();
             }
         	try {
-        		this.clients.get(id).put(flip);
+        		this.clients.get(flipID).put(flip);
         	} catch (InterruptedException e) {
         		e.printStackTrace();
         	}
@@ -294,16 +301,18 @@ public class WebServer {
       	 exchange.sendResponseHeaders(200, 0);
 
     	   final String id = request;
+    	   final String watchID = "/watch/" + id;
     	   final Request watch = new WatchRequest(id, exchange);
     	   
-    	   
-    	   if (!clients.containsKey(id)) {
+    	   if (!players.contains(id)) {
     		   this.board.addPlayer(id);
-    		   clients.put(id, new SynchronousQueue<Request>());
+    	   }
+    	   if (!clients.containsKey(watchID)) {
+    		   clients.put(watchID, new SynchronousQueue<Request>());
     		   new Thread(() ->  {
     			   try {
     				   while (true) {
-    					   this.handleRequest(this.clients.get(id).take());
+    					   this.handleRequest(this.clients.get(watchID).take());
     				   }
 				} catch (IOException | InterruptedException e) {
 					// TODO Auto-generated catch block
@@ -312,7 +321,7 @@ public class WebServer {
     		   }).start();
     	   }
     	   try {
-    		   this.clients.get(id).put(watch);
+    		   this.clients.get(watchID).put(watch);
     	   } catch (InterruptedException e1) {
     		   // TODO Auto-generated catch block
     		   e1.printStackTrace();
