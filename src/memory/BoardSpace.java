@@ -78,10 +78,14 @@ public interface BoardSpace {
 	public String character();
 	
 	/**
-	 * 
-	 * @return image representation of the card
+	 * Attempts to acquire a lock on the board space
 	 */
-	public BufferedImage generate();
+	public void lock(); 
+	
+	/**
+	 * Attempts to release the lock on the board space. 
+	 */
+	public void unlock();
 	
 	@Override
 	public String toString();

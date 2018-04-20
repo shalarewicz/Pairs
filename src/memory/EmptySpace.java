@@ -1,7 +1,5 @@
 package memory;
 
-import java.awt.image.BufferedImage;
-
 public class EmptySpace implements BoardSpace {
 
 	private final int row, col;
@@ -16,7 +14,7 @@ public class EmptySpace implements BoardSpace {
 	 */
 	
 	
-	EmptySpace(int col, int row) {
+	public EmptySpace(int col, int row) {
 		this.row = row;
 		this.col = col;
 		checkRep();
@@ -101,8 +99,13 @@ public class EmptySpace implements BoardSpace {
 	}
 	
 	@Override
-	public BufferedImage generate() {
-		// TODO Auto-generated method stub
-		return null;
+	public void lock(){
+		// don't do anything
 	}
+	
+	@Override
+	public void unlock(){
+		// Don't do anything.
+	}
+	
 }

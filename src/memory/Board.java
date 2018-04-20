@@ -3,6 +3,8 @@
  */
 package memory;
 
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
 import java.io.File;
@@ -13,6 +15,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+
 
 /**
  * 
@@ -78,7 +81,7 @@ public class Board {
     
     private final static BoardSpace EMPTY_SPACE = new EmptySpace(0, 0);
     
-    private static class Pair<E> {
+    public static class Pair<E> {
     	final E i, j;
     	
     	public Pair(E i, E j) {
@@ -258,30 +261,67 @@ public class Board {
     public String look(String id) {
     	StringBuilder sb = new StringBuilder();
     	
-    	for (int i = 0; i < this.cards.length; i++) {
-    		for (int j = 0; j < this.cards[i].length; j++) {
-    			BoardSpace card = this.cards[i][j];
-    			if (card.isFaceUp()) {
-    				if (card.getOwner().equals(id)) {
-    					sb.append(">");
-    				}
-    				else {
-    					sb.append(" ");
-    				}
-    				sb.append(card.character());
-    			}
-    			else if (!card.isEmpty()) {
-    				sb.append(" *");
-    			}
-    			else {
-    				sb.append("  ");
-    			}
-    		}
-    		if (i != this.cards.length - 1) {
-    			sb.append("\n");
-    		}
+    	synchronized (this.cards) {
+	    	for (int i = 0; i < this.cards.length; i++) {
+	    		for (int j = 0; j < this.cards[i].length; j++) {
+	    			BoardSpace card = this.cards[i][j];
+	    			if (card.isFaceUp()) {
+	    				if (card.getOwner().equals(id)) {
+	    					sb.append(">");
+	    				}
+	    				else {
+	    					sb.append(" ");
+	    				}
+	    				sb.append(card.character());
+	    			}
+	    			else if (!card.isEmpty()) {
+	    				sb.append(" *");
+	    			}
+	    			else {
+	    				sb.append("  ");
+	    			}
+	    		}
+	    		if (i != this.cards.length - 1) {
+	    			sb.append("\n");
+	    		}
+	    	}
     	}
     	return sb.toString();
+    }
+    
+    /**
+     * 
+     * @param id player looking at the board
+     * @return an http server response of the board
+     */
+    public String httpLook(String id) {
+    	StringBuilder sb = new StringBuilder(this.WIDTH + "\n" + this.HEIGHT + "\n");
+    	
+//    	System.out.println("reading cards for http response");
+    	for (int i = 0; i < this.cards.length; i++) {
+    		for (int j = 0; j < this.cards[i].length; j++) {
+//    			System.out.println("Starting");
+    			BoardSpace card = this.cards[i][j];
+//    			System.out.println("got card");
+    			if (card.isFaceUp()) {
+    				if (card.getOwner().equals(id)) {
+//    					System.out.println("checked face up and owner");
+    					sb.append("my " + card.character());
+    				}
+    				else sb.append("up " + card.character());
+    			} else if (card.isEmpty()) {
+    				sb.append("none");
+    			}
+    			else {
+    				sb.append("down");
+    			}
+    			sb.append("\n");
+//    			System.out.println("finishing");
+    		}
+    	}
+//    	System.out.println("created http response");
+    	return sb.toString();
+    	
     }
     
     /**
@@ -304,46 +344,88 @@ public class Board {
     	Player p = this.playerIDs.get(player);
     	
     	// obtain a lock on the card
-    	synchronized (this.cards[row - 1][col - 1]) {
-    		final BoardSpace card = this.cards[row - 1][col - 1];
-    		
-    		// Handle the cards the player holds
-    		this.checkCards(player);
-    		
-    		BoardSpace first = this.players.get(p).getFirst();
-    		BoardSpace second = this.players.get(p).getSecond();
-    		
-    		// Check if the player tries to flip a card he already controls
-    		if (first.equals(card) || second.equals(card)) {
-    			return false;
-    		}
-    		
-    		// Attempt to flip the card. 
-    		try {
-    			boolean result = card.claim(player);
-    			
-    			if (result) {
-    				// If the player successfully flipped the card. Add the card to the players control
-    				if (first.isEmpty()) {
-    					this.players.put(p, new Pair<BoardSpace>(card, second));
-    				} 
-    				else if (second.isEmpty()) {
-    					this.players.put(p, new Pair<BoardSpace>(first, card));
-    				}
-    				else {
-    					throw new RuntimeException("Should never get here player already holds two cards");
-    				}
-    			}
-    			checkRep();
-    			return result;
-    		} catch (IndexOutOfBoundsException e) {
-    			return false;
-    		}
+    	// TODO Not blocking correctly. Need to test this. Another player does not take control of a card after
+    	// another player relinquishes control. 
+    	// Not blocking until card is released but rather until card is flipped.
+    	// Lock is only held until a player succeeds/fails in flipping the card. 
+    	// Need to block on control
+    	
+//    	while (this.cards[row - 1][col - 1].hasOwner()) {
+//    		System.out.println("Player: " + player + " is blocking for " + row + ", " + col + 
+//    				" currently owned by " + this.cards[row - 1][col - 1].getOwner() );
+//    		continue;
+//    		//TODO Is this the right way to fix blocking problem?
+//    		//TODO Need a listener here
+//    	}
+    	System.out.println("Acquiring lock on array space");
+    	synchronized (this.cards[row -1][col -1]) {
+    		System.out.println("locking the card");
+    	this.cards[row - 1][col - 1].lock();
+    	try {
+//    		System.out.println("Player: " + player + " acquired lock on " + row + ", " + col);
+	    //	synchronized (this.cards[row - 1][col - 1]) {
+	    		final BoardSpace card = this.cards[row - 1][col - 1];
+	    		
+	    		// Handle the cards the player holds
+//	    		System.out.println("checking cards");
+	    		this.checkCards(player);
+//	    		System.out.println("checked cards");
+	    		BoardSpace first = this.players.get(p).getFirst();
+	    		BoardSpace second = this.players.get(p).getSecond();
+	    		
+//	    		System.out.println("Got " + player + "' s cards");
+	    		// Check if the player tries to flip a card he already controls
+	    		if (first.equals(card) || second.equals(card)) {
+	    			return false;
+	    		}
+//	    		System.out.println("checked equal");
+	    		
+	    		// Attempt to flip the card. 
+	    		try {
+	    			boolean result = card.claim(player);
+//	    			System.out.println(player + "claimed card");
+	    			if (result) {
+	    				// If the player successfully flipped the card. Add the card to the players control
+	    				if (first.isEmpty()) {
+//	    					System.out.println("putting first");
+	    					this.players.put(p, new Pair<BoardSpace>(card, second));
+//	    					System.out.println("put first");
+	    				} 
+	    				else if (second.isEmpty()) {
+//	    					System.out.println("putting second");
+	    					this.players.put(p, new Pair<BoardSpace>(first, card));
+//	    					System.out.println("put second");
+	    				}
+	    				else {
+	    					throw new RuntimeException("Should never get here player already holds two cards");
+	    				}
+	    			}
+	    			checkRep();
+//	    			System.out.println("Checked rep after " + player + " flipped " + col+ ", " + row);
+	//    			this.addActionListener(new ActionListener() {
+	//    				@Override
+	//    			    public void actionPerformed(ActionEvent event) {
+	//    			        generate();
+	//    			    }
+	//    			});
+	    				
+	    			return result;
+	    		} catch (IndexOutOfBoundsException e) {
+	    			return false;
+	    		}
+	    	//}
+    	} catch (Exception e) {
+    		System.out.println(e);
+    		e.printStackTrace();
+    		throw new RuntimeException(e.getMessage());
+    	} 
+    	
     	}
-	    
     }
     
-    /**
+   
+
+	/**
      * Return the card at (row, column) = (i,j) on the board
      * @param row row of the card
      * @param col column of the card
@@ -367,14 +449,20 @@ public class Board {
      * @param id id of the player whose cards are being checked. 
      */
     private void checkCards(String id) {
+//    	System.out.println("Acuiring player for " + id);
     	Player player = playerIDs.get(id);
+//    	System.out.println("Acuired player for " + id);
     	
     	// Get the cards the player currently holds
+//    	System.out.println("Acuiring cards for " + id);
     	BoardSpace first = players.get(player).getFirst();
     	BoardSpace second = players.get(player).getSecond();
+//    	System.out.println("Acquired cards for " + id);
     	
+//    	System.out.println("Building empties");
     	final BoardSpace empty1 = new EmptySpace(first.col(), first.row());
     	final BoardSpace empty2 = new EmptySpace(second.col(), second.row());
+//    	System.out.println("Built empties");
     	
     	// Obtain a lock on the array. Do not need to lock each card since Card is threadsafe. 
     	// Furthermore, if the cards are removed from the board we have a lock on cards so we're good. 
@@ -384,21 +472,32 @@ public class Board {
     	// flips first then we removed the card the player would still be unable to flip the card as it is currently owned. On the
     	// other hand if the cards didn't match then a lock on the card is obtained before flipping it. Is this the same as a lock 
     	// in the Card object?
+//    	System.out.println(id + " acquiring lock in checkCards");
     	synchronized (this.cards) {
+//    		System.out.println(id + " acquired lock in checkCards");
     		if (first.match(second)){
+//    			System.out.println(id + "'s cards match");
+    			//TODO This will fuck with the locks. Potential deadlock
+    			first.release();
     			this.cards[first.row() - 1][first.col() - 1] = empty1;
+    			second.release();
     			this.cards[second.row() - 1][second.col() - 1] = empty2;
     			this.players.put(player, new Pair<BoardSpace>(empty1, empty2));
     		} else if (!first.isEmpty() && !second.isEmpty()){
+//    			System.out.println(id + "'s cards don't match");
     			// Are these locks necessary since each BoardSpace is threadsafe?
-    			synchronized (this.cards[first.row() - 1][first.col() - 1] ) {
+    			//synchronized (this.cards[first.row() - 1][first.col() - 1] ) {
+//    				System.out.println("Releaseing one");
+//    				System.out.println("unlocking");
 	    			first.release();
 	    			first.putFaceDown();
-    			}
-    			synchronized (this.cards[second.row() - 1][second.col() - 1] ) {
+    			//}
+    			//synchronized (this.cards[second.row() - 1][second.col() - 1] ) {
+//    				System.out.println("Releasing two" );
+//    				System.out.println("unlocking");
 	    			second.release();
 	    			second.putFaceDown();
-    			}
+    		//	}
     			this.players.put(player, new Pair<BoardSpace>(empty1, empty2));
     		}
     	}

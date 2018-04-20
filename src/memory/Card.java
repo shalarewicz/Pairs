@@ -1,6 +1,7 @@
 package memory;
 
-import java.awt.image.BufferedImage;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class Card implements BoardSpace{
 
@@ -12,6 +13,9 @@ public class Card implements BoardSpace{
 	boolean faceUp = false;
 	String owner = "";
 	private final int row, col;
+	final ReentrantLock lock = new ReentrantLock();
+	private String lockOwner = "";
+//	Boolean lock = false;
 	
 	/*
 	 * AF(character) - A card at (row, col) that can be played on a memory scramble board. 
@@ -40,12 +44,13 @@ public class Card implements BoardSpace{
 	}
 	
 	@Override
-	public synchronized int row() {
+	public int row() {
+//		System.out.println("getting row");
 		return this.row;
 	}
 	
 	@Override
-	public synchronized int col() {
+	public int col() {
 		return this.col;
 	}
 	
@@ -53,7 +58,7 @@ public class Card implements BoardSpace{
 	 * 
 	 * @return true if the card is face up
 	 */
-	public synchronized boolean isFaceUp() {
+	public boolean isFaceUp() {
 		return this.faceUp;
 	}
 	
@@ -67,7 +72,7 @@ public class Card implements BoardSpace{
 	 * Turns a card face down. If the card is controlled by a player the card remains face up
 	 * @return true if the card in now face down
 	 */
-	public synchronized boolean putFaceDown() {
+	public boolean putFaceDown() {
 		if (!this.hasOwner()) {
 			this.faceUp = false;
 		}
@@ -81,7 +86,7 @@ public class Card implements BoardSpace{
 	 * @param id id of the player claiming the card
 	 * @return true if the card is successfully. returns false if the card was already controlled
 	 */
-	public synchronized boolean claim(String id) {
+	public boolean claim(String id) {
 		if (!this.hasOwner()) {
 			this.owner = id;
 			this.faceUp = true;
@@ -94,8 +99,14 @@ public class Card implements BoardSpace{
 	/**
 	 * releases the card from its owner
 	 */
-	public synchronized void release() {
-		this.owner = "";
+	public void release() {
+		synchronized (this.lock){
+			this.owner = "";
+//			System.out.println("unlocked");
+			this.lock.unlock();
+//			this.lock = false;
+			this.lock.notify();
+		}
 		checkRep();
 	}
 	
@@ -103,7 +114,7 @@ public class Card implements BoardSpace{
 	 * 
 	 * @return id of the current owner of the card. 
 	 */
-	public synchronized String getOwner() {
+	public String getOwner() {
 		return this.owner;
 	}
 	
@@ -111,7 +122,7 @@ public class Card implements BoardSpace{
 	 * 
 	 * @return true if the card has an owner
 	 */
-	public synchronized boolean hasOwner() {
+	public boolean hasOwner() {
 		return !this.owner.equals("");
 	}
 	
@@ -129,17 +140,48 @@ public class Card implements BoardSpace{
 		return this.character;
 	}
 	
-	/**
-	 * 
-	 * @return image representation of the card
-	 */
-	public BufferedImage generate() {
-		//TODO
-		return null;
+	@Override
+	public void lock(){
+		synchronized (this.lock){
+			while (this.lock.isLocked()) {
+				if (this.lock.isHeldByCurrentThread()) {break;}
+				System.out.println(this + " is locked");
+				try {
+					this.lock.wait();
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+					throw new RuntimeException("wait interupted");
+				}
+			}
+			this.lock.lock();
+//			while (this.lock) {
+//				try {
+//					this.lock.wait();
+//				} catch (InterruptedException e) {
+//					// TODO Auto-generated catch block
+//					e.printStackTrace();
+//				}
+//			}
+//			this.lock = true;
+//			this.lock.notify();
+		}
+//		System.out.println("locked. lock is " + this.lock.isLocked());
+//		System.out.println("lock held by this thread " + this.lock.isHeldByCurrentThread());
+	}
+	
+	@Override
+	public void unlock(){
+		synchronized (this.lock){
+//			System.out.println("unlocked");
+//			this.lock = false;
+//			this.lock.notify();
+			this.lock.unlock();
+			this.lock.notify();
+		}
 	}
 
 	@Override
-	public synchronized boolean isEmpty() {
+	public boolean isEmpty() {
 		return false;
 	}
 	
@@ -150,6 +192,7 @@ public class Card implements BoardSpace{
 	
 	@Override
 	public boolean equals(Object that) {
+//		System.out.println("checking equality");
 		return that instanceof Card && this.equalParts((Card) that);
 	}
 	
@@ -159,7 +202,8 @@ public class Card implements BoardSpace{
 	 * @return true if the both cards have the same character, owner and are either both face down 
 	 * or both face up. 
 	 */
-	private synchronized boolean equalParts(Card that) {
+	private boolean equalParts(Card that) {
+//		System.out.println("checking parts");
 		return this.character == that.character && 
 				this.owner == that.owner && 
 				this.faceUp == that.faceUp &&

@@ -171,4 +171,13 @@ public class CardTest {
     	assertFalse("expected unequal", UNICODE.equals(TEST));
     }
     
+    @Test
+    public void testLocking() {
+    	final Card TEST = new Card("\u00A9", 1, 1);
+    	TEST.lock();
+    	TEST.unlock();
+    	TEST.lock();
+    	TEST.release();
+    }
+    
 }

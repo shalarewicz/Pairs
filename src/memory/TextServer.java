@@ -174,6 +174,9 @@ public class TextServer {
 	        	return board.look(id);
         	} catch (ArrayIndexOutOfBoundsException e) {
         		throw new UnsupportedOperationException("Not enough argumetns for command: " + input);
+        	} catch (NumberFormatException nfe) {
+        		throw new UnsupportedOperationException("Could not read row or column: row = " 
+        													+ tokens[1] + ", col = " + tokens[2]);
         	}
         }
         
