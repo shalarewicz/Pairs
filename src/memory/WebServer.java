@@ -89,7 +89,6 @@ public class WebServer {
         hello.getFilters().addAll(Arrays.asList(log, headers));
         
         
-        //TODO Create a new thread for each type of request from a player
         // Flip requests must continue to be sent while a watch request blocks. 
         // Look requests should also be able to be sent while a flip or watch request blocks
         // Concurrent flips are not allowed. 
