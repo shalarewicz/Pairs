@@ -76,7 +76,7 @@ public class ServerMain {
             board = Board.parseFromFile(arguments.remove());
         } else if (arguments.size() >= 4) {
             final int columns, rows;
-            try {
+            try { 
                 columns = Integer.parseInt(arguments.remove());
                 rows = Integer.parseInt(arguments.remove());
             } catch (NumberFormatException nfe) {

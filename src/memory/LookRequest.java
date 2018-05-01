@@ -4,6 +4,7 @@ import com.sun.net.httpserver.HttpExchange;
 
 public class LookRequest implements Request {
 	
+	
 	private final String player;
 	private final HttpExchange exchange;
 
@@ -23,6 +24,11 @@ public class LookRequest implements Request {
 
 	@Override
 	public boolean isWatch() {
+		return false;
+	}
+	
+	@Override
+	public boolean isQuit() {
 		return false;
 	}
 

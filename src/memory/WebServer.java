@@ -20,7 +20,6 @@ import java.util.concurrent.SynchronousQueue;
 
 import com.sun.net.httpserver.HttpContext;
 import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 
 import memory.web.HeadersFilter;
@@ -39,14 +38,14 @@ public class WebServer {
     final ConcurrentMap<String, BlockingQueue<Request>> clients = new ConcurrentHashMap<String, BlockingQueue<Request>>();
     final Set<String> players = new HashSet<String>();
     
-    // Abstraction function:
-    //   TODO
+    // Abstraction function: 
+    // 	 A web server over which players can play the game memory scramble through various requests
     // Representation invariant:
-    //   TODO
+    //   assert true;
     // Safety from rep exposure:
-    //   TODO
+    //   only primitive fields are returned
     // Thread safety argument:
-    //   TODO
+    //   //TODO Responses might not be sent in the order in which the Request was sent. 
     
     /**
      * Make a new web game server using board that listens for connections on port.
@@ -69,16 +68,12 @@ public class WebServer {
         // all responses will be plain-text UTF-8
         headers.add("Content-Type", "text/plain; charset=utf-8");
         
-        
-        // Check if the player making the request is on the board and add them if necessary
-        
-        
         // handle requests for paths that start with /hello/, e.g. /hello/world
-        HttpContext hello = server.createContext("/hello/", new HttpHandler() {
-            public void handle(HttpExchange exchange) throws IOException {
-                handleHello(exchange);
-            }
-        });
+        //   HttpContext hello = server.createContext("/hello/", new HttpHandler() {
+        //      public void handle(HttpExchange exchange) throws IOException {
+        //          handleHello(exchange);
+        //      }
+        //  });
         // -or- use a lambda expression with "->"
         //HttpContext hello = server.createContext("/hello/", exchange -> handleHello(exchange));
         // -or- use a method reference with "::"
@@ -86,26 +81,30 @@ public class WebServer {
         
         // add logging to the /hello/ handler and set required HTTP headers
         //   (do this on all your handlers)
-        hello.getFilters().addAll(Arrays.asList(log, headers));
+        // hello.getFilters().addAll(Arrays.asList(log, headers));
         
         
-        // Flip requests must continue to be sent while a watch request blocks. 
-        // Look requests should also be able to be sent while a flip or watch request blocks
-        // Concurrent flips are not allowed. 
         // Handle requests for /look/player
+        // Look requests should also be able to be sent while a flip or watch request blocks
 		HttpContext look = server.createContext("/look/", exchange -> handleLook(exchange));
 		look.getFilters().addAll(Arrays.asList(log, headers));
 		
-		// Handle reqeusts for /flip/player/row,col
+		// Handle requests for /flip/player/row,col
+		// Concurrent flips are not allowed. 
 		HttpContext flip = server.createContext("/flip/", exchange -> handleFlip(exchange));
     	flip.getFilters().addAll(Arrays.asList(log, headers));
     	
     	// Handle requests for /watch/player
+    	// Flip requests must continue to be sent while a watch request blocks. 
     	HttpContext watch = server.createContext("/watch/", exchange -> handleWatch(exchange));
         watch.getFilters().addAll(Arrays.asList(log, headers));
+        
+        checkRep();
     }
     
-    // TODO checkRep
+    private void checkRep() {
+    	assert true;
+    }
     
     /**
      * @return the port on which this server is listening for connections
@@ -129,45 +128,7 @@ public class WebServer {
         System.err.println("Server will stop");
         server.stop(0);
     }
-    
-    /*
-     * Handle a request for /hello/<what> by responding with "Hello, <what>!" if
-     *   <what> is a single word; error 404 otherwise.
-     * 
-     * @param exchange HTTP request/response, modified by this method to send a
-     *                 response to the client and close the exchange
-     */
-    private void handleHello(HttpExchange exchange) throws IOException {
-        // if you want to know the requested path:
-        final String path = exchange.getRequestURI().getPath();
-        
-        // it will always start with the base path from server.createContext():
-        final String base = exchange.getHttpContext().getPath();
-        assert path.startsWith(base);
-        
-        final String whatToGreet = path.substring(base.length());
-        
-        final String response;
-        if (whatToGreet.matches("\\w+")) {
-            // if the request is valid, respond with HTTP code 200 to indicate success
-            // - response length 0 means a response will be written
-            // - you must call this method before calling getResponseBody()
-            exchange.sendResponseHeaders(200, 0);
-            response = "Hello, " + whatToGreet + "!";
-        } else {
-            // otherwise, respond with HTTP code 404 to indicate an error
-            exchange.sendResponseHeaders(404, 0);
-            response = "Go away, " + whatToGreet + ".";
-        }
-        // write the response to the output stream using UTF-8 character encoding
-        OutputStream body = exchange.getResponseBody();
-        PrintWriter out = new PrintWriter(new OutputStreamWriter(body, StandardCharsets.UTF_8), true);
-        out.println(response);
-        
-        // if you do not close the exchange, the response will not be sent!
-        exchange.close();
-    }
-    
+     
     private void handleLook(HttpExchange exchange) throws IOException {
     	// if you want to know the requested path:
         final String path = exchange.getRequestURI().getPath();
@@ -179,21 +140,19 @@ public class WebServer {
         final String id = path.substring(base.length());
         final String lookID = "/look/" + id;
         
+        // Check if the request is valid
         if (id.matches("\\w+")) {
-        	 System.out.println("found valid look");
-        	 exchange.sendResponseHeaders(200, 0);
-        	// Check if the request is valid
+        	exchange.sendResponseHeaders(200, 0);
         	final Request look = new LookRequest(id, exchange);
         	
-        	// IF the player is not on the board add them to the board and start a thread for them to handle 
+        	// IF the player is not on the board add them to the board and start a thread for them to handle look requests
         	if (!players.contains(id)) {
         		board.addPlayer(id);
         	}
         	if (!clients.containsKey(lookID)) {
         		clients.put(lookID, new SynchronousQueue<Request>());
     			new Thread(() -> {
-    				//Start a thread for the player
-    				System.out.println("started thread for " + id);
+    				//Start a thread for the player to handle look requests
     				while (true) {
 	        			try {
 							handleRequest(clients.get(lookID).take());
@@ -234,7 +193,8 @@ public class WebServer {
         if (request.matches("[\\w]+/[0-9]+,[0-9]+")) {
         	// If the request is valid
         	final int endPlayerIndex = request.indexOf("/");
-        	final int colRowDelimiterIndex = request.substring(endPlayerIndex).indexOf(","); //TODO create static variable
+        	final String colRowDelimiter = ",";
+        	final int colRowDelimiterIndex = request.substring(endPlayerIndex).indexOf(colRowDelimiter);
         	
         	final String id = request.substring(0, endPlayerIndex);
         	final String flipID = "/flip/" + id;
@@ -253,13 +213,11 @@ public class WebServer {
             	this.clients.put(flipID, new SynchronousQueue<Request>());
             	new Thread(() -> {
             		System.out.println("Started a thread in flip for " + id);
-            		//TODO While loop might not be necessary
             		while (true) {
 	            		try {
 	            			
 							this.handleRequest(this.clients.get(flipID).take());
 						} catch (IOException | InterruptedException e) {
-							// TODO Auto-generated catch block
 							e.printStackTrace();
 						}
             		}
@@ -286,7 +244,6 @@ public class WebServer {
     }
     
     private void handleWatch(HttpExchange exchange) throws IOException {
-    	// TODO Block until a change in the board occurs then return current board. 
     	// if you want to know the requested path:
         final String path = exchange.getRequestURI().getPath();
         
@@ -313,16 +270,14 @@ public class WebServer {
     				   while (true) {
     					   this.handleRequest(this.clients.get(watchID).take());
     				   }
-				} catch (IOException | InterruptedException e) {
-					// TODO Auto-generated catch block
+    			   } catch (IOException | InterruptedException e) {
 					e.printStackTrace();
-				}
+    			   }
     		   }).start();
     	   }
     	   try {
     		   this.clients.get(watchID).put(watch);
     	   } catch (InterruptedException e1) {
-    		   // TODO Auto-generated catch block
     		   e1.printStackTrace();
     	   }
         } else {
@@ -384,7 +339,6 @@ public class WebServer {
     			}
     		
     		});
-    		//TODO ? not sure what will happen here. 
     		return;
     		
     	} else {

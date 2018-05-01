@@ -22,19 +22,19 @@ public class TextServer {
     
     private final ServerSocket serverSocket;
     private final Board board;
-    //TODO Use a concurrent hashset
-    final Set<String> clientIDs = new HashSet<String>();
+    final Set<Integer> clientIDs = new HashSet<Integer>();
     int nextClientID = 1;
-    
+     
     // Abstraction function:
     //   a server allowing you to play a memory scramble game using text protocols
     // Representation invariant:
-    //   TODO
+    //   true
     // Safety from rep exposure:
     //   port() returns an integer
     // 	 handleRequest() returns immutable string. 
     // 	 remaining methods do not return an object. 
     // Thread safety argument:
+    //   Each player is given their own thread to interact with the board but since 
     //   Board is a threadsafe data type, therefore all references to board are threadsafe.
     
     /**
@@ -50,7 +50,6 @@ public class TextServer {
         this.checkRep();
     }
     
-    // TODO checkRep
     private void checkRep() {
     	assert true;
     }
@@ -72,30 +71,27 @@ public class TextServer {
     	//Client IDs are assigned by order of connection starting at 1;
     	
         while (true) {
+        	// block until a client connects
         	Socket s = serverSocket.accept();
         	if (s.isConnected()) {
+        		// Once connected assign the client a random client ID
+        		int temp = (int) Math.floor(Math.random() * Math.pow(16, 8));
+
+        		// Check to make sure the client ID is unique and was successfully added
+        		while (clientIDs.contains(temp)) {
+        			temp = (int) Math.floor(Math.random() * Math.pow(16, 8));
+        		}
+        		final int clientID = temp;
+        		clientIDs.add(clientID);
+        		System.out.println("Connected client with id " + clientID);
+        		this.board.addPlayer(String.valueOf(clientID));
+        		
 	        	new Thread(() -> {
-	        		// block until a client connects
 	        		Socket socket = s;
-	        		int clientID;
 					try {
-		        		//Assign the client the next available client ID. 
-						synchronized (this.clientIDs) {
-			        		clientID = this.nextClientID;
-			        		
-			        		// Check to make sure the client ID is unique and was successfully added
-			        		while (!clientIDs.add(String.valueOf(clientID))) {
-			        			clientID++;
-			        		}
-			        		System.out.println("Connecting a client with id " + clientID);
-			        		nextClientID = clientID + 1;
-			        		System.out.println("Current clients " + clientIDs);
-			        		this.board.addPlayer(String.valueOf(clientID));
-						}
 		        		// handle the client
 		        		try {
-		        			//	System.out.println("handling");
-		        			handleConnection(socket, String.valueOf(clientID));
+		        			handleConnection(socket, clientID);
 		        		} catch (IOException ioe) {
 		        			ioe.printStackTrace(); // but do not stop serving
 		        		} finally {
@@ -119,14 +115,14 @@ public class TextServer {
      * @param socket socket connected to client
      * @throws IOException if the connection encounters an error or closes unexpectedly
      */
-    private void handleConnection(Socket socket, String id) throws IOException {
+    private void handleConnection(Socket socket, int id) throws IOException {
         BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
         PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
         
         try {
             for (String input = in.readLine(); input != null; input = in.readLine()) {
             	try {
-            		String output = handleRequest(input, id);
+            		String output = handleRequest(input, String.valueOf(id));
             		if (output.equals("")) {
             			this.clientIDs.remove(id);
             			socket.close();
@@ -181,7 +177,7 @@ public class TextServer {
         }
         
         if (tokens[0].equals("quit")) {
-        	//TODO Connection with client. Do not return a message. Can create a response interface
+        	//TODO Connection with client. Do not return a message. Can create a response interface for text protocols
         	// response ::= quit + board
         	return "";
         }

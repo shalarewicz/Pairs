@@ -2,6 +2,9 @@ package memory;
 
 public class EmptySpace implements BoardSpace {
 
+	/**
+	 * An empty space on a Memory scramble board. 
+	 */
 	private final int row, col;
 	
 	/*
@@ -13,7 +16,12 @@ public class EmptySpace implements BoardSpace {
 	 * 		EmptySpace is immutable;
 	 */
 	
-	
+	 
+	/**
+	 * Creates a new empty space at row, col
+	 * @param col column of the space
+	 * @param row row of the space
+	 */
 	public EmptySpace(int col, int row) {
 		this.row = row;
 		this.col = col;
@@ -63,11 +71,6 @@ public class EmptySpace implements BoardSpace {
 	}
 
 	@Override
-	public boolean putFaceDown() {
-		return false;
-	}
-
-	@Override
 	public boolean claim(String id) {
 		return false;
 	}
@@ -96,16 +99,6 @@ public class EmptySpace implements BoardSpace {
 	public String character() {
 		return " ";
 
-	}
-	
-	@Override
-	public void lock(){
-		// don't do anything
-	}
-	
-	@Override
-	public void unlock(){
-		// Don't do anything.
 	}
 	
 }

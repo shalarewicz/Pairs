@@ -9,7 +9,7 @@ public class Card implements BoardSpace{
 	 * Cards can be controlled by players and turned over on the board. 
 	 */
 	final String character;
-	boolean faceUp = false;
+	Boolean faceUp = false;
 	String owner = "";
 	private final int row, col;
 	private final ReentrantLock lock = new ReentrantLock();
@@ -20,8 +20,10 @@ public class Card implements BoardSpace{
 	 * Safety from rep exposure:
 	 * 		only final values or primitive types are returned
 	 * Thread Safety Argument - 
+	 * 		int() and col() return immutable parts of the rep and are therefore threadsafe
+	 * 		The following methods all obtain a lock on the Card before returning values and are therefore threadsafe. 
 	 * 		All methods which mutate or observe non final parts of the rep 
-	 * 		first obtain a lock on the entire object. 
+	 * 		first obtain a lock on that part of the rep before it is viewed or modified. 
 	 */
 	
 	/**
@@ -42,7 +44,6 @@ public class Card implements BoardSpace{
 	
 	@Override
 	public int row() {
-//		System.out.println("getting row");
 		return this.row;
 	}
 	
@@ -51,12 +52,11 @@ public class Card implements BoardSpace{
 		return this.col;
 	}
 	
-	/**
-	 * 
-	 * @return true if the card is face up
-	 */
+	@Override
 	public boolean isFaceUp() {
-		return this.faceUp;
+		synchronized (this.faceUp) {
+			return this.faceUp;
+		}
 	}
 	
 	private void checkRep() {
@@ -65,64 +65,49 @@ public class Card implements BoardSpace{
 		
 	}
 	
-	/**
-	 * Turns a card face down. If the card is controlled by a player the card remains face up
-	 * @return true if the card in now face down
-	 */
-	public boolean putFaceDown() {
-		if (!this.hasOwner()) {
-			this.faceUp = false;
-		}
-		checkRep();
-		return !this.faceUp;
-	}
-
-	/**
-	 * Attempts to claim a card. A card can only be claimed if it it not currently controlled. 
-	 * If the card is face down and not controlled it will be face up.
-	 * @param id id of the player claiming the card
-	 * @return true if the card is successfully. returns false if the card was already controlled
-	 */
+	@Override
 	public boolean claim(String id) {
-		//synchronized (this.lock) {
-		//	this.lock.lock();
+		this.lock();
 			if (!this.hasOwner()) {
-				this.owner = id;
-				this.faceUp = true;
+				synchronized (owner) {
+					this.owner = id;
+				}
+				synchronized (faceUp) {
+					this.faceUp = true;
+				}
 				checkRep();
 				return true;
 			}
 			return false;
-			
-		//}
 	}
 	
-	/**
-	 * releases the card from its owner
-	 */
+	@Override
 	public void release() {
 		synchronized (this.lock){
-			this.owner = "";
+			synchronized (owner) {
+				this.owner = "";
+			}
+			synchronized (faceUp) {
+				this.faceUp = false;
+			}
 			this.lock.unlock();
 			this.lock.notify();
 		}
 		checkRep();
 	}
 	
-	/**
-	 * 
-	 * @return id of the current owner of the card. 
-	 */
+	@Override
 	public String getOwner() {
-		return this.owner;
+		synchronized (owner) {
+			return this.owner;
+		}
 	}
 	
-	/**
-	 * 
-	 * @return true if the card has an owner
-	 */
+	@Override
 	public boolean hasOwner() {
-		return !this.owner.equals("");
+		synchronized (owner) {
+			return !this.owner.equals("");
+		}
 	}
 	
 	@Override
@@ -139,12 +124,13 @@ public class Card implements BoardSpace{
 		return this.character;
 	}
 	
-	@Override
-	public void lock(){
+	/**
+	 * Attempts to obtain the lock on the card. 
+	 */
+	private void lock(){
 		synchronized (this.lock){
 			while (this.lock.isLocked()) {
-				if (this.lock.isHeldByCurrentThread()) {break;}
-				System.out.println(this + " is locked");
+				if (this.lock.isHeldByCurrentThread()) {return;}
 				try {
 					this.lock.wait();
 				} catch (InterruptedException e) {
@@ -156,14 +142,6 @@ public class Card implements BoardSpace{
 		}
 	}
 	
-	@Override
-	public void unlock(){
-		synchronized (this.lock){
-			this.lock.unlock();
-			this.lock.notify();
-		}
-	}
-
 	@Override
 	public boolean isEmpty() {
 		return false;
@@ -181,23 +159,19 @@ public class Card implements BoardSpace{
 	}
 	
 	/**
-	 * 
 	 * @param that
-	 * @return true if the both cards have the same character, owner and are either both face down 
+	 * @return true if the both cards have the same character and position 
 	 * or both face up. 
 	 */
 	private boolean equalParts(Card that) {
-//		System.out.println("checking parts");
 		return this.character == that.character && 
-				this.owner == that.owner && 
-				this.faceUp == that.faceUp &&
 				this.row == that.row &&
 				this.col == that.col;
 	}
 
 	@Override
 	public int hashCode() {
-		return 0;
+		return this.row * 31 + this.col;
 	}
 	
 }

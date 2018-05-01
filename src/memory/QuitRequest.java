@@ -2,23 +2,24 @@ package memory;
 
 import com.sun.net.httpserver.HttpExchange;
 
-public class FlipRequest implements Request {
-	
-	private final int row, col;
+public class QuitRequest implements Request {
+
 	private final String player;
 	private final HttpExchange exchange;
 
-	 
-	public FlipRequest(int column, int row, String player, HttpExchange exchange) {
-		this.row = row;
-		this.col = column;
+	public QuitRequest(String player, HttpExchange exchange) {
 		this.player = player;
 		this.exchange = exchange;
 	}
 	
+	public QuitRequest(String player) {
+		this.player = player;
+		this.exchange = null;
+	}
+	
 	@Override
 	public boolean isFlip() {
-		return true;
+		return false;
 	}
 
 	@Override
@@ -30,30 +31,30 @@ public class FlipRequest implements Request {
 	public boolean isWatch() {
 		return false;
 	}
-	
+
 	@Override
 	public boolean isQuit() {
-		return false;
-	}
-
-	@Override
-	public int row() {
-		return this.row;
-	}
-
-	@Override
-	public int col() {
-		return this.col;
-	}
-
-	@Override
-	public String player() {
-		return this.player;
+		return true;
 	}
 
 	@Override
 	public HttpExchange exchange() {
 		return this.exchange;
+	}
+
+	@Override
+	public int row() {
+		return 0;
+	}
+
+	@Override
+	public int col() {
+		return 0;
+	}
+
+	@Override
+	public String player() {
+		return this.player;
 	}
 
 }

@@ -1,6 +1,5 @@
 package memory;
 
-import java.awt.image.BufferedImage;
 
 public interface BoardSpace {
 
@@ -33,12 +32,6 @@ public interface BoardSpace {
 	public boolean isFaceUp();
 	
 	/**
-	 * Turns a card face down. If the card is controlled by a player the card remains face up
-	 * @return true if the card in now face down
-	 */
-	public boolean putFaceDown();
-	
-	/**
 	 * Attempts to turn over a card so that it is face up. A card can only be turned over by 
 	 * it is not currently controlled. 
 	 * @param id id of the player turning the card over
@@ -47,7 +40,7 @@ public interface BoardSpace {
 	public boolean claim(String id);
 	
 	/**
-	 * releases the card from its owner
+	 * Releases the card from its owner and puts it face down. 
 	 */
 	public void release();
 	
@@ -77,16 +70,7 @@ public interface BoardSpace {
 	 */
 	public String character();
 	
-	/**
-	 * Attempts to acquire a lock on the board space
-	 */
-	public void lock(); 
-	
-	/**
-	 * Attempts to release the lock on the board space. 
-	 */
-	public void unlock();
-	
+
 	@Override
 	public String toString();
 	

@@ -3,9 +3,6 @@
  */
 package memory;
 
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -81,40 +78,9 @@ public class Board {
     private final ConcurrentMap<Player, Pair<BoardSpace>> players = new ConcurrentHashMap<Player, Pair<BoardSpace>>();
     private final ConcurrentMap<String, Player> playerIDs = new ConcurrentHashMap<String, Player>();
     
-    private final List<BoardListener> listeners = new ArrayList();
+    private final List<BoardListener> listeners = new ArrayList<BoardListener>();
     
     private final static BoardSpace EMPTY_SPACE = new EmptySpace(0, 0);
-    
-    public static class Pair<E> {
-    	final E i, j;
-    	
-    	public Pair(E i, E j) {
-    		this.i = i;
-    		this.j = j;
-    	}
-    	
-    	public E getFirst() {
-    		return this.i;
-    	}
-    	
-    	public E getSecond() {
-    		return this.j;
-    	}
-    	@Override
-    	public boolean equals(Object that) {
-    		return that instanceof Pair<?> && this.sameParts((Pair<?>) that);
-    	}
-    	
-    	@Override
-    	public String toString() {
-    		return "(" + this.i + ", " + this.j + ")";
-    	}
-    	
-    	private boolean sameParts(Pair<?> that) {
-    		return this.i.equals(i) && this.j.equals(j);
-    	}
-
-    }
     
     
     // Abstraction function:
@@ -127,15 +93,12 @@ public class Board {
     // 	 each player either controls 0 cards, 1 card or 2 unique cards
     // Safety from rep exposure:
     //   only primitive types (int, boolean) or immutable Strings are returned. 
-    // Thread safety argument:
+    // Thread safety argument: TODO
     //   players and playerIDs are implemented using a ConcurrentHashMap which is a threadsafe data type
-    //   Pair<E> is an immutable type. 
-    // 	 cards look utilizes a lock on cards while looking at the board. 
-    // 	 flip obtains a lock on the card before attempting to flip the card. 
+    // 	 Players obtain a lock when trying to claim a card. Players will block until a lock can be obtained. As BoardSpace is threadsafe
+    // 	 all access to BoardSpace Objects are threadsafe. 
     // 	 checkCards obtains a lock on cards before modifying the board. 
-    // 	 Card is a threadsafe data type therefore all actions involving card are threadsafe. 
-    //   TODO Constructors are threadsafe as they obtain a lock on cards. 
-    // 
+    //   look() and httpLook() obtain locks on this.cards and therefore are not affected when cards are rmoved in checkCards. 
     
     /**
      * 
@@ -224,16 +187,6 @@ public class Board {
     	checkRep();
     }
     
-    //TODO Remove for debugging only
-    private void printCards() {
-    	for (int i = 0; i < HEIGHT; i++) {
-    		for (int j = 0; j < WIDTH; j++) {
-    			System.out.print(this.cards[i][j].character() + ", ");
-    		}
-    		System.out.println();
-    	}
-    }
-    
     private void checkRep() {
     	// check cards is width x height;
     	assert cards.length * cards[0].length== this.WIDTH * this.HEIGHT;
@@ -299,17 +252,24 @@ public class Board {
      * @return an http server response of the board
      */
     public String httpLook(String id) {
+    	/*
+    	 * Response has format 
+    	 *  RESPONSE ::= COLUMN NEWLINE ROW NEWLINE (SPOT NEWLINE)+
+		 *	PLAYER ::= [\w]+
+		 *	SPOT ::= "none" | "down" | "up " CARD | "my " CARD
+	 	 *	CARD ::= [^\s\n\r]+
+		 *	COLUMN ::= INT
+		 *	ROW ::= INT
+		 *	INT ::= [0-9]+
+		 *	NEWLINE ::= "\n" | "\r" "\n"?
+    	 */
     	StringBuilder sb = new StringBuilder(this.WIDTH + "\n" + this.HEIGHT + "\n");
     	
-//    	System.out.println("reading cards for http response");
     	for (int i = 0; i < this.cards.length; i++) {
     		for (int j = 0; j < this.cards[i].length; j++) {
-//    			System.out.println("Starting");
     			BoardSpace card = this.cards[i][j];
-//    			System.out.println("got card");
     			if (card.isFaceUp()) {
     				if (card.getOwner().equals(id)) {
-//    					System.out.println("checked face up and owner");
     					sb.append("my " + card.character());
     				}
     				else sb.append("up " + card.character());
@@ -320,10 +280,8 @@ public class Board {
     				sb.append("down");
     			}
     			sb.append("\n");
-//    			System.out.println("finishing");
     		}
     	}
-//    	System.out.println("created http response");
     	return sb.toString();
     	
     }
@@ -347,63 +305,41 @@ public class Board {
     	
     	Player p = this.playerIDs.get(player);
     	
-    	// obtain a lock on the card
-    //	synchronized (this.cards[row -1][col -1]) {
-    		System.out.println("locking the card");
-    	this.cards[row - 1][col - 1].lock();
+    	// Atempt to claim the card. If the card is locked then this blocks until a lock is obtained. 
+    	boolean result = this.cards[row - 1][col - 1].claim(player);
     	try {
-//    		System.out.println("Player: " + player + " acquired lock on " + row + ", " + col);
-	    //	synchronized (this.cards[row - 1][col - 1]) {
 	    		final BoardSpace card = this.cards[row - 1][col - 1];
 	    		
-	    		// Handle the cards the player holds
-//	    		System.out.println("checking cards");
+	    		// Handle the cards the player holds. If the player holds two matching cards they are removed from the board.
+	    		// If the player holds two non-matching cards they are released and turned over
 	    		this.checkCards(player);
-//	    		System.out.println("checked cards");
 	    		BoardSpace first = this.players.get(p).getFirst();
 	    		BoardSpace second = this.players.get(p).getSecond();
 	    		
-//	    		System.out.println("Got " + player + "' s cards");
 	    		// Check if the player tries to flip a card he already controls
 	    		if (first.equals(card) || second.equals(card)) {
 	    			return false;
 	    		}
-//	    		System.out.println("checked equal");
 	    		
-	    		// Attempt to flip the card. 
 	    		try {
-	    			boolean result = card.claim(player);
-//	    			System.out.println(player + "claimed card");
+	    			// If the player successfully flipped the card. Add the card to the players control and notify all board listeners
 	    			if (result) {
-	    				// If the player successfully flipped the card. Add the card to the players control
 	    				if (first.isEmpty()) {
-//	    					System.out.println("putting first");
 	    					this.players.put(p, new Pair<BoardSpace>(card, second));
-//	    					System.out.println("put first");
 	    				} 
 	    				else if (second.isEmpty()) {
-//	    					System.out.println("putting second");
 	    					this.players.put(p, new Pair<BoardSpace>(first, card));
-//	    					System.out.println("put second");
 	    				}
 	    				else {
 	    					throw new RuntimeException("Should never get here player already holds two cards");
 	    				}
+	    				this.notifyBoardListeners();
 	    			}
 	    			checkRep();
-	//    			this.addActionListener(new ActionListener() {
-	//    				@Override
-	//    			    public void actionPerformed(ActionEvent event) {
-	//    			        generate();
-	//    			    }
-	//    			});
-	    				
-	    			if (result) {this.notifyBoardListeners();}
 	    			return result;
 	    		} catch (IndexOutOfBoundsException e) {
 	    			return false;
 	    		}
-	    	//}
     	} catch (Exception e) {
     		System.out.println(e);
     		e.printStackTrace();
@@ -411,9 +347,6 @@ public class Board {
     	} 
     	
     	}
-//    }
-    
-   
 
 	/**
      * Return the card at (row, column) = (i,j) on the board
@@ -421,12 +354,14 @@ public class Board {
      * @param col column of the card
      * @return BoardSpace at position (i,j) or an empty space if space is not on board
      */
-    //TODO Is this method used for testing only? Not threadsafe
+    // For Testing only
     BoardSpace getCard(int col, int row) {
-    	try {
-    		return this.cards[row - 1][col - 1];
-    	} catch (IndexOutOfBoundsException e) {
-    		return new EmptySpace(0, 0);
+    	synchronized (this.cards) {
+	    	try {
+	    		return this.cards[row - 1][col - 1];
+	    	} catch (IndexOutOfBoundsException e) {
+	    		return new EmptySpace(0, 0);
+	    	}
     	}
     }
     
@@ -439,36 +374,19 @@ public class Board {
      * @param id id of the player whose cards are being checked. 
      */
     private void checkCards(String id) {
-//    	System.out.println("Acuiring player for " + id);
     	Player player = playerIDs.get(id);
-//    	System.out.println("Acuired player for " + id);
     	
     	// Get the cards the player currently holds
-//    	System.out.println("Acuiring cards for " + id);
     	BoardSpace first = players.get(player).getFirst();
     	BoardSpace second = players.get(player).getSecond();
-//    	System.out.println("Acquired cards for " + id);
     	
-//    	System.out.println("Building empties");
     	final BoardSpace empty1 = new EmptySpace(first.col(), first.row());
     	final BoardSpace empty2 = new EmptySpace(second.col(), second.row());
-//    	System.out.println("Built empties");
     	
     	// Obtain a lock on the array. Do not need to lock each card since Card is threadsafe. 
-    	// Furthermore, if the cards are removed from the board we have a lock on cards so we're good. 
-    	// TODO What if a player tries to flip a card while you are removing cards. A lock on the spot in the 
-    	// array won't solve the problem. Can't put a lock on flip because other players should be allowed to flip a card
-    	// at the same time. In it's current state it can be seen as the player was too slow to flip the card, but if the player
-    	// flips first then we removed the card the player would still be unable to flip the card as it is currently owned. On the
-    	// other hand if the cards didn't match then a lock on the card is obtained before flipping it. Is this the same as a lock 
-    	// in the Card object?
-//    	System.out.println(id + " acquiring lock in checkCards");
-    //	synchronized (this.cards) {
-//    		System.out.println(id + " acquired lock in checkCards");
+    	synchronized (this.cards) {
     		if (first.match(second)){
-//    			System.out.println(id + "'s cards match");
-    			//TODO Players are still blocking after a card is removed
-    			System.out.println("Removing matching cards");
+    			// If the cards match release the card and remove it from the board. 
     			this.cards[first.row() - 1][first.col() - 1].release();
     			this.cards[first.row() - 1][first.col() - 1] = empty1;
     			this.cards[second.row() - 1][second.col() - 1].release();
@@ -476,24 +394,13 @@ public class Board {
     			this.players.put(player, new Pair<BoardSpace>(empty1, empty2));
     			this.notifyBoardListeners();
     		} else if (!first.isEmpty() && !second.isEmpty()){
-//    			System.out.println(id + "'s cards don't match");
-    			// Are these locks necessary since each BoardSpace is threadsafe?
-    			//synchronized (this.cards[first.row() - 1][first.col() - 1] ) {
-//    				System.out.println("Releaseing one");
-//    				System.out.println("unlocking");
-	    			first.release();
-	    			first.putFaceDown();
-    			//}
-    			//synchronized (this.cards[second.row() - 1][second.col() - 1] ) {
-//    				System.out.println("Releasing two" );
-//    				System.out.println("unlocking");
-	    			second.release();
-	    			second.putFaceDown();
-	    			this.notifyBoardListeners();
-    		//	}
+    			// Otherwise if the cards don't match and the player holds two cards. Release the cards and put them face down
+    			first.release();
+    			second.release();
+    			this.notifyBoardListeners();
     			this.players.put(player, new Pair<BoardSpace>(empty1, empty2));
     		}
-    //	}
+    	}
     	
     }
     
@@ -511,10 +418,19 @@ public class Board {
     	return result;
     }
     
+    /**
+     * Adds a board listener
+     * @param listener listener to be added. 
+     */
     public void addBoardListener(BoardListener listener) {
     	this.listeners.add(listener);
     }
     
+    /**
+     * Notifies all board listeners of a change to the board and performs the action associated with the listener. 
+     * Players are notified when a card is turned over, removed or released. Note that players are only notified when 
+     * after a player releases both cards and both cards are already face down or after both matching cards are removed. 
+     */
     protected void notifyBoardListeners() {
     	this.listeners.forEach(listener -> listener.onBoardChange());
     }

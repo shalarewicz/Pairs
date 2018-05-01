@@ -10,6 +10,12 @@ public interface Request {
 	
 	public boolean isWatch();
 	
+	public boolean isQuit();
+	
+	/**
+	 * 
+	 * @return The exchange for the HTTP request or null if the request was from a text protocol
+	 */
 	public HttpExchange exchange();
 	
 	public int row();

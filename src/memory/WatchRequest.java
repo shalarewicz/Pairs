@@ -25,6 +25,11 @@ public class WatchRequest implements Request {
 	public boolean isWatch() {
 		return true;
 	}
+	
+	@Override
+	public boolean isQuit() {
+		return false;
+	}
 
 	@Override
 	public int row() {
